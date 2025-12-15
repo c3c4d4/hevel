@@ -38,6 +38,7 @@ static struct {
 	struct {
 		bool left, right;
 		bool activated;
+		bool killing;
 		bool selecting;
 		struct wl_event_source *timer;
 		int32_t start_x, start_y;
@@ -316,6 +317,25 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 	printf("button %s (%d) %s\n", name, b, pressed ? "pressed" : "released");
 
 	handle_chord = (b == BTN_LEFT || b == BTN_RIGHT);
+
+	if (b == BTN_LEFT && !pressed && hevel.chord.killing) {
+		if (cursor_position(&x, &y)) {
+			struct swc_window *target = swc_window_at(x, y);
+
+			if (target)
+				swc_window_close(target);
+		}
+		hevel.chord.killing = false;
+		return;
+	}
+
+	if (b == BTN_LEFT && pressed && was_right && !hevel.chord.activated) {
+		click_cancel();
+		stop_select();
+		hevel.chord.activated = true;
+		hevel.chord.killing = true;
+		return;
+	}
 
 	if(hevel.chord.left && hevel.chord.right && !hevel.chord.activated){
 		click_cancel();
