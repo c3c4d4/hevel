@@ -42,6 +42,8 @@ static struct {
 		bool scrolling;
 		bool moving;
 		bool resize;
+		int32_t move_start_win_x, move_start_win_y;
+		int32_t move_start_cursor_x, move_start_cursor_y;
 		int32_t scroll_rem;
 		int32_t scroll_pending_px;
 		struct wl_event_source *scroll_timer;
@@ -139,9 +141,8 @@ move_scroll_tick(void *data)
 {
 	int32_t x, y;
 	struct screen *s;
+	struct swc_rectangle geometry;
 	int32_t screen_height = 0;
-	const int32_t edge_threshold = 80;
-	const int32_t scroll_speed = 8;
 
 	(void)data;
 	if(!hevel.chord.moving)
@@ -163,15 +164,26 @@ move_scroll_tick(void *data)
 		return 0;
 	}
 
+	/* get where the where the window starts [line 558], every 16ms calculate where it should be
+	 * then move only <config-value>% of that gap, then next frame, move
+	 * <config-value>% of the new, smaller gap, exponential easing*/
+	if(hevel.focused && swc_window_get_geometry(hevel.focused, &geometry)){
+		int32_t target_x = hevel.chord.move_start_win_x + (x - hevel.chord.move_start_cursor_x);
+		int32_t target_y = hevel.chord.move_start_win_y + (y - hevel.chord.move_start_cursor_y);
+		int32_t new_x = geometry.x + (int32_t)((target_x - geometry.x) * move_ease_factor);
+		int32_t new_y = geometry.y + (int32_t)((target_y - geometry.y) * move_ease_factor);
+		swc_window_set_position(hevel.focused, new_x, new_y);
+	}
+
 	/* check near top bottom and scroll accordingly */
-	if(y < edge_threshold){
-		hevel.chord.scroll_pending_px += scroll_speed;
+	if(y < move_scroll_edge_threshold){
+		hevel.chord.scroll_pending_px += move_scroll_speed;
 		if(!hevel.chord.scroll_timer)
 			hevel.chord.scroll_timer = wl_event_loop_add_timer(hevel.evloop, scroll_tick, NULL);
 		if(hevel.chord.scroll_timer)
 			wl_event_source_timer_update(hevel.chord.scroll_timer, 1);
-	} else if(y > screen_height - edge_threshold){
-		hevel.chord.scroll_pending_px -= scroll_speed;
+	} else if(y > screen_height - move_scroll_edge_threshold){
+		hevel.chord.scroll_pending_px -= move_scroll_speed;
 		if(!hevel.chord.scroll_timer)
 			hevel.chord.scroll_timer = wl_event_loop_add_timer(hevel.evloop, scroll_tick, NULL);
 		if(hevel.chord.scroll_timer)
@@ -541,8 +553,16 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		hevel.chord.activated = true;
 		hevel.chord.moving = true;
 
-		if (hevel.focused)
-			swc_window_begin_move(hevel.focused);
+		/* get starting pos to be used for easing calculation*/
+		if(hevel.focused && cursor_position(&x, &y)){
+			struct swc_rectangle geometry;
+			if(swc_window_get_geometry(hevel.focused, &geometry)){
+				hevel.chord.move_start_win_x = geometry.x;
+				hevel.chord.move_start_win_y = geometry.y;
+				hevel.chord.move_start_cursor_x = x;
+				hevel.chord.move_start_cursor_y = y;
+			}
+		}
 
 		/* auto-scroll timer for scroll durin win move */
 		if(!hevel.chord.move_scroll_timer)
@@ -555,9 +575,6 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 	if (b == BTN_LEFT && !pressed && hevel.chord.moving == true) {
 		hevel.chord.moving = false;
-
-		if (hevel.focused)
-			swc_window_end_move(hevel.focused);
 
 		/* stop timer */
 		if(hevel.chord.move_scroll_timer){

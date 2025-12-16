@@ -14,3 +14,7 @@ static const char *const select_havoc_app_id = "hevel-select";
 
 static const int chord_click_timeout_ms = 125;
 
+static const int32_t move_scroll_edge_threshold = 80;
+static const int32_t move_scroll_speed = 8;
+static const float move_ease_factor = 0.37f;
+
