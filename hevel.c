@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
+#include <inttypes.h>
 #include <wayland-server.h>
 #include <linux/input-event-codes.h>
 #include <xkbcommon/xkbcommon-keysyms.h>
@@ -27,6 +28,7 @@ static const int scrollpx = 64;
 static const int scrollms = 16;
 static const int scrollease = 4;
 static const int scrollcap = 64;
+static bool debugscroll = false;
 static struct {
 	struct wl_display *display;
 	struct wl_event_loop *evloop;
@@ -41,6 +43,9 @@ static struct {
 		int32_t scroll_rem;
 		int32_t scroll_pending_px;
 		struct wl_event_source *scroll_timer;
+		struct swc_window *scroll_last;
+		struct swc_rectangle scroll_last_geo;
+		int32_t scroll_last_step;
 		bool selecting;
 		struct wl_event_source *timer;
 		int32_t start_x, start_y;
@@ -173,25 +178,32 @@ click_cancel(void)
 static void
 scroll_stop(void)
 {
-	if (hevel.chord.scroll_timer) {
-		wl_event_source_remove(hevel.chord.scroll_timer);
-		hevel.chord.scroll_timer = NULL;
-	}
 	hevel.chord.scroll_pending_px = 0;
 	hevel.chord.scroll_rem = 0;
+	hevel.chord.scroll_last = NULL;
+	hevel.chord.scroll_last_step = 0;
 }
 
 static int
 scroll_tick(void *data)
 {
-	struct window *w;
+	struct window *w, *tmp;
 	struct swc_rectangle geometry;
 	int32_t rem = hevel.chord.scroll_pending_px;
 	int32_t step;
+	static unsigned tickno;
 
 	(void)data;
 
+	if (!hevel.chord.scroll_timer) {
+		if (debugscroll)
+			fprintf(stderr, "[scroll] tick with no timer\n");
+		return 0;
+	}
+
 	if (!hevel.chord.scrolling || rem == 0) {
+		if (debugscroll && tickno % 10 == 0)
+			fprintf(stderr, "[scroll] tick stop scrolling=%d rem=%d\n", hevel.chord.scrolling, rem);
 		scroll_stop();
 		return 0;
 	}
@@ -204,11 +216,26 @@ scroll_tick(void *data)
 	if (step < -scrollcap)
 		step = -scrollcap;
 
-	wl_list_for_each(w, &hevel.windows, link) {
-		if (!swc_window_get_geometry(w->swc, &geometry))
-			continue;
-		swc_window_set_position(w->swc, geometry.x, geometry.y + step);
+	if (debugscroll && (++tickno % 10 == 0 || step == scrollcap || step == -scrollcap)) {
+		fprintf(stderr, "[scroll] tick rem=%d step=%d pending=%d last=%p\n",
+		        rem, step, hevel.chord.scroll_pending_px, (void *)hevel.chord.scroll_last);
 	}
+
+	wl_list_for_each_safe(w, tmp, &hevel.windows, link) {
+		if (!w->swc) {
+			if (debugscroll)
+				fprintf(stderr, "[scroll] window node with null swc\n");
+			continue;
+		}
+			if (!swc_window_get_geometry(w->swc, &geometry))
+				continue;
+			if (debugscroll) {
+				hevel.chord.scroll_last = w->swc;
+				hevel.chord.scroll_last_geo = geometry;
+				hevel.chord.scroll_last_step = step;
+			}
+			swc_window_set_position(w->swc, geometry.x, geometry.y + step);
+		}
 
 	hevel.chord.scroll_pending_px -= step;
 	wl_event_source_timer_update(hevel.chord.scroll_timer, scrollms);
@@ -223,34 +250,62 @@ axis(void *data, uint32_t time, uint32_t axis, int32_t value120)
 	(void)data;
 
 	if (!hevel.chord.scrolling) {
+		if (debugscroll)
+			fprintf(stderr, "[scroll] forward axis=%u value120=%d (not scrolling)\n", axis, value120);
 		swc_pointer_send_axis(time, axis, value120);
 		return;
 	}
 
 	if (axis != 0 || value120 == 0) {
+		if (debugscroll)
+			fprintf(stderr, "[scroll] forward axis=%u value120=%d (axis!=0 or stop)\n", axis, value120);
 		swc_pointer_send_axis(time, axis, value120);
 		return;
 	}
 
 	/* preserve sub-step precision for dat smooth, smooth scrolling */
-	int32_t dy_num = hevel.chord.scroll_rem + value120 * scrollpx;
-	dy = dy_num / 120;
-	hevel.chord.scroll_rem = dy_num % 120;
+	int64_t dy_num = (int64_t)hevel.chord.scroll_rem + (int64_t)value120 * (int64_t)scrollpx;
+	if (dy_num > INT32_MAX)
+		dy_num = INT32_MAX;
+	if (dy_num < INT32_MIN)
+		dy_num = INT32_MIN;
+	dy = (int32_t)dy_num / 120;
+	hevel.chord.scroll_rem = (int32_t)dy_num % 120;
 
 	if (dy == 0)
 		return;
 
-	hevel.chord.scroll_pending_px += dy;
+	if (debugscroll) {
+		fprintf(stderr, "[scroll] axis time=%u value120=%d dy=%d rem=%d pending=%d timer=%p\n",
+		        time, value120, dy, hevel.chord.scroll_rem, hevel.chord.scroll_pending_px,
+		        (void *)hevel.chord.scroll_timer);
+	}
+
+	int64_t pending = (int64_t)hevel.chord.scroll_pending_px + (int64_t)dy;
+	if (pending > 100000 || pending < -100000) {
+		if (debugscroll)
+			fprintf(stderr, "[scroll] pending overflow %" PRId64 "; resetting\n", pending);
+		scroll_stop();
+		return;
+	}
+	hevel.chord.scroll_pending_px = (int32_t)pending;
 	if (!hevel.chord.scroll_timer)
 		hevel.chord.scroll_timer = wl_event_loop_add_timer(hevel.evloop, scroll_tick, NULL);
-	if (hevel.chord.scroll_timer)
+	if (hevel.chord.scroll_timer) {
 		wl_event_source_timer_update(hevel.chord.scroll_timer, 1);
+	} else if (debugscroll) {
+		fprintf(stderr, "[scroll] failed to create timer; falling back to immediate\n");
+		hevel.chord.scroll_pending_px = 0;
+		hevel.chord.scroll_rem = 0;
+	}
 }
 
 static void
 windowdestroy(void *data)
 {
 	struct window *w = data;
+	if (hevel.chord.scroll_last == w->swc)
+		hevel.chord.scroll_last = NULL;
 	if(hevel.focused == w->swc)
 		focus_window(NULL, "destroy");
 	wl_list_remove(&w->link);
@@ -419,6 +474,8 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		hevel.chord.activated = true;
 		hevel.chord.scrolling = true;
 		scroll_stop();
+		if (debugscroll)
+			fprintf(stderr, "[scroll] start\n");
 		return;
 	}
 
@@ -458,8 +515,11 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 	if(is_chord_button && hevel.chord.activated && !hevel.chord.selecting){
 		if (!hevel.chord.right)
 			hevel.chord.scrolling = false;
-		if (!hevel.chord.scrolling)
+		if (!hevel.chord.scrolling) {
+			if (debugscroll)
+				fprintf(stderr, "[scroll] stop\n");
 			scroll_stop();
+		}
 		if(!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
 			hevel.chord.activated = false;
 		return;

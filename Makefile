@@ -19,7 +19,9 @@ hevel: $(SWC_LIB) hevel.o
 hevel.o: hevel.c $(SWC_DIR)/libswc/swc.h
 	$(CC) $(CFLAGS) -c hevel.c
 
-$(SWC_LIB):
+FORCE:
+
+$(SWC_LIB): FORCE
 	$(MAKE) -C $(SWC_DIR)
 
 clean:
@@ -29,4 +31,4 @@ clean:
 install: hevel
 	install -D -m 755 hevel $(DESTDIR)$(BINDIR)/hevel
 
-.PHONY: clean install
+.PHONY: clean install FORCE
