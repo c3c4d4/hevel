@@ -40,6 +40,7 @@ static struct {
 		bool activated;
 		bool killing;
 		bool scrolling;
+		bool moving;
 		int32_t scroll_rem;
 		int32_t scroll_pending_px;
 		struct wl_event_source *scroll_timer;
@@ -446,7 +447,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 	is_lr = (b == BTN_LEFT || b == BTN_RIGHT);
 	is_chord_button = (is_lr || b == BTN_MIDDLE);
-
+	
 	if (b == BTN_LEFT && !pressed && hevel.chord.killing) {
 		if (cursor_position(&x, &y)) {
 			struct swc_window *target = swc_window_at(x, y);
@@ -467,7 +468,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		hevel.chord.killing = true;
 		return;
 	}
-
+	
 	if (b == BTN_MIDDLE && pressed && was_right && !hevel.chord.activated) {
 		click_cancel();
 		stop_select();
@@ -476,6 +477,31 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		scroll_stop();
 		if (debugscroll)
 			fprintf(stderr, "[scroll] start\n");
+		return;
+	}
+
+	if (b == BTN_MIDDLE && !pressed && was_left && ! hevel.chord.activated && !hevel.chord.selecting) {
+		click_cancel();
+		stop_select();
+		hevel.chord.activated = true;
+		hevel.chord.moving = true;
+	
+		if (hevel.focused)
+			swc_window_begin_move(hevel.focused);
+
+		return;
+	}
+
+	if (b == BTN_LEFT && !pressed && hevel.chord.moving == true) {
+		hevel.chord.moving = false;
+		
+		if (hevel.focused)
+			swc_window_end_move(hevel.focused);
+
+
+		if (!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
+			hevel.chord.activated = false;
+		
 		return;
 	}
 
