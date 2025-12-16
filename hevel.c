@@ -52,6 +52,7 @@ static struct {
 		int32_t start_x, start_y;
 		int32_t cur_x, cur_y;
 		struct wl_event_source *click_timer;
+		struct wl_event_source *move_scroll_timer;
 		struct {
 			bool pending;
 			bool forwarded;
@@ -110,6 +111,8 @@ stop_select(void)
 	swc_overlay_clear();
 }
 
+static int scroll_tick(void *data);
+
 static int
 select_tick(void *data)
 {
@@ -127,6 +130,54 @@ select_tick(void *data)
 	}
 
 	wl_event_source_timer_update(hevel.chord.timer, 16);
+	return 0;
+}
+
+static int
+move_scroll_tick(void *data)
+{
+	int32_t x, y;
+	struct screen *s;
+	int32_t screen_height = 0;
+	const int32_t edge_threshold = 80;
+	const int32_t scroll_speed = 8;
+
+	(void)data;
+	if(!hevel.chord.moving)
+		return 0;
+
+	/* get screen size,  only first screen */
+	wl_list_for_each(s, &hevel.screens, link){
+		screen_height = s->swc->geometry.height;
+		break;
+	}
+
+	if(screen_height == 0){
+		wl_event_source_timer_update(hevel.chord.move_scroll_timer, 16);
+		return 0;
+	}
+
+	if(!cursor_position(&x, &y)){
+		wl_event_source_timer_update(hevel.chord.move_scroll_timer, 16);
+		return 0;
+	}
+
+	/* check near top bottom and scroll accordingly */
+	if(y < edge_threshold){
+		hevel.chord.scroll_pending_px += scroll_speed;
+		if(!hevel.chord.scroll_timer)
+			hevel.chord.scroll_timer = wl_event_loop_add_timer(hevel.evloop, scroll_tick, NULL);
+		if(hevel.chord.scroll_timer)
+			wl_event_source_timer_update(hevel.chord.scroll_timer, 1);
+	} else if(y > screen_height - edge_threshold){
+		hevel.chord.scroll_pending_px -= scroll_speed;
+		if(!hevel.chord.scroll_timer)
+			hevel.chord.scroll_timer = wl_event_loop_add_timer(hevel.evloop, scroll_tick, NULL);
+		if(hevel.chord.scroll_timer)
+			wl_event_source_timer_update(hevel.chord.scroll_timer, 1);
+	}
+
+	wl_event_source_timer_update(hevel.chord.move_scroll_timer, 16);
 	return 0;
 }
 
@@ -202,9 +253,9 @@ scroll_tick(void *data)
 		return 0;
 	}
 
-	if (!hevel.chord.scrolling || rem == 0) {
+	if ((!hevel.chord.scrolling && !hevel.chord.moving) || rem == 0) {
 		if (debugscroll && tickno % 10 == 0)
-			fprintf(stderr, "[scroll] tick stop scrolling=%d rem=%d\n", hevel.chord.scrolling, rem);
+			fprintf(stderr, "[scroll] tick stop scrolling=%d moving=%d rem=%d\n", hevel.chord.scrolling, hevel.chord.moving, rem);
 		scroll_stop();
 		return 0;
 	}
@@ -228,15 +279,18 @@ scroll_tick(void *data)
 				fprintf(stderr, "[scroll] window node with null swc\n");
 			continue;
 		}
-			if (!swc_window_get_geometry(w->swc, &geometry))
-				continue;
-			if (debugscroll) {
-				hevel.chord.scroll_last = w->swc;
-				hevel.chord.scroll_last_geo = geometry;
-				hevel.chord.scroll_last_step = step;
-			}
-			swc_window_set_position(w->swc, geometry.x, geometry.y + step);
+		/* when scroll with moving window, dont scroll the moving window, it makes it all jittery and ew */
+		if (hevel.chord.moving && w->swc == hevel.focused)
+			continue;
+		if (!swc_window_get_geometry(w->swc, &geometry))
+			continue;
+		if (debugscroll) {
+			hevel.chord.scroll_last = w->swc;
+			hevel.chord.scroll_last_geo = geometry;
+			hevel.chord.scroll_last_step = step;
 		}
+		swc_window_set_position(w->swc, geometry.x, geometry.y + step);
+	}
 
 	hevel.chord.scroll_pending_px -= step;
 	wl_event_source_timer_update(hevel.chord.scroll_timer, scrollms);
@@ -485,23 +539,34 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		stop_select();
 		hevel.chord.activated = true;
 		hevel.chord.moving = true;
-	
+
 		if (hevel.focused)
 			swc_window_begin_move(hevel.focused);
+
+		/* auto-scroll timer for scroll durin win move */
+		if(!hevel.chord.move_scroll_timer)
+			hevel.chord.move_scroll_timer = wl_event_loop_add_timer(hevel.evloop, move_scroll_tick, NULL);
+		if(hevel.chord.move_scroll_timer)
+			wl_event_source_timer_update(hevel.chord.move_scroll_timer, 16);
 
 		return;
 	}
 
 	if (b == BTN_LEFT && !pressed && hevel.chord.moving == true) {
 		hevel.chord.moving = false;
-		
+
 		if (hevel.focused)
 			swc_window_end_move(hevel.focused);
 
+		/* stop timer */
+		if(hevel.chord.move_scroll_timer){
+			wl_event_source_remove(hevel.chord.move_scroll_timer);
+			hevel.chord.move_scroll_timer = NULL;
+		}
 
 		if (!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
 			hevel.chord.activated = false;
-		
+
 		return;
 	}
 
