@@ -11,6 +11,8 @@
 #include <xkbcommon/xkbcommon-keysyms.h>
 #include <swc.h>
 
+#include "config.h"
+
 struct window {
 	struct swc_window *swc;
 	struct wl_list link;
@@ -20,14 +22,6 @@ struct screen {
 	struct swc_screen *swc;
 	struct wl_list link;
 };
-
-static const uint32_t border_color_active = 0xff285577;
-static const uint32_t border_color_inactive = 0xff222222;
-static const uint32_t border_width = 2;
-static const uint32_t select_box_color = 0xffffffff;
-static const uint32_t select_box_border = 2;
-static const char *const select_havoc_app_id = "hevel-select";
-static const int chord_click_timeout_ms = 125;
 
 static struct {
 	struct wl_display *display;
@@ -69,12 +63,12 @@ focus_window(struct swc_window *swc, const char *reason)
 	       (void *)hevel.focused, from, (void *)swc, to, reason);
 
 	if(hevel.focused)
-		swc_window_set_border(hevel.focused, border_color_inactive, border_width);
+		swc_window_set_border(hevel.focused, inner_border_color_inactive, inner_border_width, outer_border_color_inactive, outer_border_width);
 
 	swc_window_focus(swc);
 
 	if(swc)
-		swc_window_set_border(swc, border_color_active, border_width);
+		swc_window_set_border(swc, inner_border_color_active, inner_border_width, outer_border_color_active, outer_border_width);
 
 	hevel.focused = swc;
 }
@@ -254,7 +248,7 @@ newwindow(struct swc_window *swc)
 	wl_list_insert(&hevel.windows, &w->link);
 	swc_window_set_handler(swc, &windowhandler, w);
 	swc_window_set_stacked(swc);
-	swc_window_set_border(swc, border_color_inactive, border_width);
+	swc_window_set_border(swc, outer_border_color_inactive, outer_border_width, inner_border_color_inactive, inner_border_width);
 	if(is_select){
 		geometry = hevel.chord.spawn.geometry;
 		if(geometry.width < 50)
@@ -396,7 +390,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 	if(b == BTN_RIGHT && !pressed && hevel.chord.selecting){
 		int32_t x1, y1, x2, y2;
 		uint32_t outer_w, outer_h;
-		uint32_t bw = border_width;
+		uint32_t bw = outer_border_width + inner_border_width;
 
 		if(!cursor_position(&x, &y)){
 			x = hevel.chord.cur_x;
