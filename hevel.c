@@ -41,6 +41,7 @@ static struct {
 		bool killing;
 		bool scrolling;
 		bool moving;
+		bool resize;
 		int32_t scroll_rem;
 		int32_t scroll_pending_px;
 		struct wl_event_source *scroll_timer;
@@ -570,6 +571,31 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		return;
 	}
 
+	if (b == BTN_MIDDLE && !pressed && was_right && ! hevel.chord.activated && !hevel.chord.selecting) {
+		click_cancel();
+		stop_select();
+		hevel.chord.activated = true;
+		hevel.chord.resize = true;
+
+		if (hevel.focused)
+			/* bottom right */
+			swc_window_begin_resize(hevel.focused, SWC_WINDOW_EDGE_RIGHT | SWC_WINDOW_EDGE_BOTTOM);
+
+		return;
+	}
+
+	if (b == BTN_RIGHT && !pressed && hevel.chord.resize == true) {
+		hevel.chord.resize = false;
+
+		if (hevel.focused)
+			swc_window_end_resize(hevel.focused);
+
+		if (!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
+			hevel.chord.activated = false;
+
+		return;
+	}
+	
 	if (b == BTN_MIDDLE && !pressed && hevel.chord.scrolling) {
 		return;
 	}
