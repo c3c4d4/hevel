@@ -1,0 +1,20 @@
+## hevel
+
+"make the user interface invisible"
+
+hevel is a scrollable, floating window manager for wayland, that uses mouse chords for commands.
+
+it's design is inspired by the ideas found in rob pike's 1988 paper, 'Window Systems Should be Transparent', taken to their logical extremes. As such, you could say it is a modernization of the line of mouse-driven unix/plan9 window systems, mux, 8½, and rio, all created by rob pike. however, it differs in the fact that there are no menus, and you are not limited to a single screen worth of space; you are able to infinitely scroll up and down, creating windows anywhere on the plane.
+
+# commands
+commands are issued using mouse chords, meaning by pressing a combination of buttons on the mouse. left click will be reffered to as 1, clicking the scroll wheel as 2, and right click as 3.
+
+- 1 -> 3 -> drag -> release -> creates a new terminal in the dragged box 
+- 3 -> 1 -> move mouse on top of target window -> release -> kill target window
+- 3 -> 2 -> release 2, and with your finger still on the scroll wheel, scroll up/down
+
+
+
+
+
+
