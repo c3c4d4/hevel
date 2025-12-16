@@ -23,6 +23,10 @@ struct screen {
 	struct wl_list link;
 };
 
+static const int scrollpx = 64;
+static const int scrollms = 16;
+static const int scrollease = 4;
+static const int scrollcap = 64;
 static struct {
 	struct wl_display *display;
 	struct wl_event_loop *evloop;
@@ -30,9 +34,13 @@ static struct {
 	struct wl_list screens;
 	struct swc_window *focused;
 	struct {
-		bool left, right;
+		bool left, middle, right;
 		bool activated;
 		bool killing;
+		bool scrolling;
+		int32_t scroll_rem;
+		int32_t scroll_pending_px;
+		struct wl_event_source *scroll_timer;
 		bool selecting;
 		struct wl_event_source *timer;
 		int32_t start_x, start_y;
@@ -163,6 +171,83 @@ click_cancel(void)
 }
 
 static void
+scroll_stop(void)
+{
+	if (hevel.chord.scroll_timer) {
+		wl_event_source_remove(hevel.chord.scroll_timer);
+		hevel.chord.scroll_timer = NULL;
+	}
+	hevel.chord.scroll_pending_px = 0;
+	hevel.chord.scroll_rem = 0;
+}
+
+static int
+scroll_tick(void *data)
+{
+	struct window *w;
+	struct swc_rectangle geometry;
+	int32_t rem = hevel.chord.scroll_pending_px;
+	int32_t step;
+
+	(void)data;
+
+	if (!hevel.chord.scrolling || rem == 0) {
+		scroll_stop();
+		return 0;
+	}
+
+	step = rem / scrollease;
+	if (step == 0)
+		step = rem > 0 ? 1 : -1;
+	if (step > scrollcap)
+		step = scrollcap;
+	if (step < -scrollcap)
+		step = -scrollcap;
+
+	wl_list_for_each(w, &hevel.windows, link) {
+		if (!swc_window_get_geometry(w->swc, &geometry))
+			continue;
+		swc_window_set_position(w->swc, geometry.x, geometry.y + step);
+	}
+
+	hevel.chord.scroll_pending_px -= step;
+	wl_event_source_timer_update(hevel.chord.scroll_timer, scrollms);
+	return 0;
+}
+
+static void
+axis(void *data, uint32_t time, uint32_t axis, int32_t value120)
+{
+	int32_t dy;
+
+	(void)data;
+
+	if (!hevel.chord.scrolling) {
+		swc_pointer_send_axis(time, axis, value120);
+		return;
+	}
+
+	if (axis != 0 || value120 == 0) {
+		swc_pointer_send_axis(time, axis, value120);
+		return;
+	}
+
+	/* preserve sub-step precision for dat smooth, smooth scrolling */
+	int32_t dy_num = hevel.chord.scroll_rem + value120 * scrollpx;
+	dy = dy_num / 120;
+	hevel.chord.scroll_rem = dy_num % 120;
+
+	if (dy == 0)
+		return;
+
+	hevel.chord.scroll_pending_px += dy;
+	if (!hevel.chord.scroll_timer)
+		hevel.chord.scroll_timer = wl_event_loop_add_timer(hevel.evloop, scroll_tick, NULL);
+	if (hevel.chord.scroll_timer)
+		wl_event_source_timer_update(hevel.chord.scroll_timer, 1);
+}
+
+static void
 windowdestroy(void *data)
 {
 	struct window *w = data;
@@ -170,13 +255,6 @@ windowdestroy(void *data)
 		focus_window(NULL, "destroy");
 	wl_list_remove(&w->link);
 	free(w);
-}
-
-static void
-windowentered(void *data)
-{
-	struct window *w = data;
-	focus_window(w->swc, "hover");
 }
 
 static void
@@ -203,7 +281,6 @@ windowappidchanged(void *data)
 static const struct swc_window_handler windowhandler = {
 	.destroy = windowdestroy,
 	.app_id_changed = windowappidchanged,
-	.entered = windowentered,
 };
 
 static void
@@ -248,7 +325,7 @@ newwindow(struct swc_window *swc)
 	wl_list_insert(&hevel.windows, &w->link);
 	swc_window_set_handler(swc, &windowhandler, w);
 	swc_window_set_stacked(swc);
-	swc_window_set_border(swc, outer_border_color_inactive, outer_border_width, inner_border_color_inactive, inner_border_width);
+	swc_window_set_border(swc, inner_border_color_inactive, inner_border_width, outer_border_color_inactive, outer_border_width);
 	if(is_select){
 		geometry = hevel.chord.spawn.geometry;
 		if(geometry.width < 50)
@@ -284,7 +361,8 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 	struct swc_rectangle geometry;
 	bool was_left = hevel.chord.left;
 	bool was_right = hevel.chord.right;
-	bool handle_chord;
+	bool is_lr;
+	bool is_chord_button;
 
 	(void)data;
 	(void)time;
@@ -298,6 +376,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		break;
 	case BTN_MIDDLE:
 		name = "middle";
+		hevel.chord.middle = pressed;
 		break;
 	case BTN_RIGHT:
 		name = "right";
@@ -310,7 +389,8 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 	printf("button %s (%d) %s\n", name, b, pressed ? "pressed" : "released");
 
-	handle_chord = (b == BTN_LEFT || b == BTN_RIGHT);
+	is_lr = (b == BTN_LEFT || b == BTN_RIGHT);
+	is_chord_button = (is_lr || b == BTN_MIDDLE);
 
 	if (b == BTN_LEFT && !pressed && hevel.chord.killing) {
 		if (cursor_position(&x, &y)) {
@@ -320,6 +400,8 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 				swc_window_close(target);
 		}
 		hevel.chord.killing = false;
+		if (!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
+			hevel.chord.activated = false;
 		return;
 	}
 
@@ -329,6 +411,30 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		hevel.chord.activated = true;
 		hevel.chord.killing = true;
 		return;
+	}
+
+	if (b == BTN_MIDDLE && pressed && was_right && !hevel.chord.activated) {
+		click_cancel();
+		stop_select();
+		hevel.chord.activated = true;
+		hevel.chord.scrolling = true;
+		scroll_stop();
+		return;
+	}
+
+	if (b == BTN_MIDDLE && !pressed && hevel.chord.scrolling) {
+		return;
+	}
+
+	if (pressed && is_lr && !hevel.chord.selecting) {
+		bool other_down = (b == BTN_LEFT) ? was_right : was_left;
+
+		if (!other_down && cursor_position(&x, &y)) {
+			struct swc_window *target = swc_window_at(x, y);
+
+			if (target)
+				focus_window(target, "click");
+		}
 	}
 
 	if(hevel.chord.left && hevel.chord.right && !hevel.chord.activated){
@@ -349,14 +455,23 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 	}
 
 	/* while a chord is active swallow left/right events so they don't go to clients */
-	if(handle_chord && hevel.chord.activated && !hevel.chord.selecting){
-		if(!hevel.chord.left && !hevel.chord.right)
+	if(is_chord_button && hevel.chord.activated && !hevel.chord.selecting){
+		if (!hevel.chord.right)
+			hevel.chord.scrolling = false;
+		if (!hevel.chord.scrolling)
+			scroll_stop();
+		if(!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
 			hevel.chord.activated = false;
 		return;
 	}
 
+	if (b == BTN_MIDDLE) {
+		swc_pointer_send_button(time, b, state);
+		return;
+	}
+
 	/* pass normal clicks through to clients */
-	if(handle_chord && pressed && !hevel.chord.selecting){
+	if(is_lr && pressed && !hevel.chord.selecting){
 		bool other_down = (b == BTN_LEFT) ? was_right : was_left;
 		if(other_down){
 			/* chord will activate via the block above */
@@ -373,7 +488,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		}
 	}
 
-	if(handle_chord && !pressed && !hevel.chord.selecting){
+	if(is_lr && !pressed && !hevel.chord.selecting){
 		if(hevel.chord.click.pending && hevel.chord.click.button == b){
 			if(!hevel.chord.click.forwarded){
 				swc_pointer_send_button(hevel.chord.click.time, hevel.chord.click.button,
@@ -418,12 +533,12 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		printf("spawned havoc at %d,%d %ux%u\n", geometry.x, geometry.y, geometry.width, geometry.height);
 	}
 
-	if(!handle_chord){
+	if(!is_lr){
 		swc_pointer_send_button(time, b, state);
 		return;
 	}
 
-	if(!hevel.chord.left && !hevel.chord.right)
+	if(!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
 		hevel.chord.activated = false;
 }
 
@@ -469,7 +584,12 @@ main(void)
 	swc_add_binding(SWC_BINDING_KEY, SWC_MOD_LOGO | SWC_MOD_SHIFT,
 	                XKB_KEY_q, quit, NULL);
 	swc_add_binding(SWC_BINDING_BUTTON, SWC_MOD_ANY, BTN_LEFT, button, NULL);
+	swc_add_binding(SWC_BINDING_BUTTON, SWC_MOD_ANY, BTN_MIDDLE, button, NULL);
 	swc_add_binding(SWC_BINDING_BUTTON, SWC_MOD_ANY, BTN_RIGHT, button, NULL);
+	if (swc_add_axis_binding(SWC_MOD_ANY, 0, axis, NULL) < 0)
+		fprintf(stderr, "cannot bind vertical scroll axis\n");
+	if (swc_add_axis_binding(SWC_MOD_ANY, 1, axis, NULL) < 0)
+		fprintf(stderr, "cannot bind horizontal scroll axis\n");
 
 	sock = wl_display_add_socket_auto(hevel.display);
 	if(!sock){
