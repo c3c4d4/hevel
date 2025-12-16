@@ -10,7 +10,8 @@ static const uint32_t inner_border_width = 2;
 static const uint32_t select_box_color = 0xffffffff;
 static const uint32_t select_box_border = 2;
 
-static const char *const select_havoc_app_id = "hevel-select";
+static const char *const select_term_app_id = "hevel-select";
+static const char *const term = "havoc";
 
 static const int chord_click_timeout_ms = 125;
 

@@ -195,7 +195,7 @@ move_scroll_tick(void *data)
 }
 
 static void
-spawn_havoc_select(const struct swc_rectangle *geometry)
+spawn_term_select(const struct swc_rectangle *geometry)
 {
 	pid_t pid;
 
@@ -204,7 +204,7 @@ spawn_havoc_select(const struct swc_rectangle *geometry)
 
 	pid = fork();
 	if(pid == 0){
-		execlp("havoc", "havoc", "-i", select_havoc_app_id, NULL);
+		execlp(term, term, "-i", select_term_app_id, NULL);
 		_exit(127);
 	}
 }
@@ -387,7 +387,7 @@ windowappidchanged(void *data)
 	struct swc_rectangle geometry;
 	bool is_select = hevel.chord.spawn.pending
 	              && w->swc->app_id
-	              && strcmp(w->swc->app_id, select_havoc_app_id) == 0;
+	              && strcmp(w->swc->app_id, select_term_app_id) == 0;
 
 	if(!is_select)
 		return;
@@ -439,7 +439,7 @@ newwindow(struct swc_window *swc)
 	struct swc_rectangle geometry;
 	bool is_select = hevel.chord.spawn.pending
 	              && swc->app_id
-	              && strcmp(swc->app_id, select_havoc_app_id) == 0;
+	              && strcmp(swc->app_id, select_term_app_id) == 0;
 
 	w = malloc(sizeof(*w));
 	if(!w)
@@ -723,8 +723,8 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		geometry.y = y1 + (int32_t)bw;
 		geometry.width = outer_w > 2 * bw ? outer_w - 2 * bw : 1;
 		geometry.height = outer_h > 2 * bw ? outer_h - 2 * bw : 1;
-		spawn_havoc_select(&geometry);
-		printf("spawned havoc at %d,%d %ux%u\n", geometry.x, geometry.y, geometry.width, geometry.height);
+		spawn_term_select(&geometry);
+		printf("spawned terminal at %d,%d %ux%u\n", geometry.x, geometry.y, geometry.width, geometry.height);
 	}
 
 	if(!is_lr){
