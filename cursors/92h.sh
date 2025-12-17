@@ -25,20 +25,17 @@ function hex2dec(s,    i,n) {
 }
 function pow2(n,    i,p) { p=1; for(i=0;i<n;i++) p*=2; return p }
 function bit16msb(v, col,    shift) {
-  # col: 0..15 from left (MSB)
   shift = 15 - col
   return int(v / P2[shift]) % 2
 }
 function pix(setb, clrb) {
-  # Plan 9 cursor semantics are applied as: dst = (dst & clr) ^ set
-  # Per pixel:
-  #   clr=1,set=0 => transparent (preserve dst)
-  #   clr=0,set=0 => black
+  #   clr=0,set=0 => transparent
+  #   clr=1,set=0 => black
   #   clr=0,set=1 => white
-  #   clr=1,set=1 => invert (map to white for a usable ARGB cursor)
-  if (clrb && !setb) return "0x00000000"
+  #   clr=1,set=1 => invert (approximate as white for ARGB cursors)
+  if (!clrb && !setb) return "0x00000000"
+  if (clrb && !setb) return "0xff000000"
   if (!clrb && setb) return "0xffffffff"
-  if (!clrb && !setb) return "0xff000000"
   return "0xffffffff"
 }
 function min(a,b){ return (a<b)?a:b }
@@ -60,7 +57,7 @@ BEGIN {
   name_cnt = 0
 }
 
-# Start of a cursor block: Cursor foo = {
+# start of a cursor block: cursor foo = {
 match($0, /^[[:space:]]*Cursor[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/) {
   # extract the name
   line = $0
@@ -76,7 +73,7 @@ match($0, /^[[:space:]]*Cursor[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/) 
   next
 }
 
-# Inside cursor: hotspot like {-7, -7},
+# inside cursor: hotspot like {-7, -7}, compute it properly so it offsets,
 in_cursor && !got_hot && match($0, /\{[[:space:]]*-?[0-9]+[[:space:]]*,[[:space:]]*-?[0-9]+[[:space:]]*\}/) {
   s = substr($0, RSTART+1, RLENGTH-2)
   gsub(/[[:space:]]*/, "", s)
@@ -86,7 +83,6 @@ in_cursor && !got_hot && match($0, /\{[[:space:]]*-?[0-9]+[[:space:]]*,[[:space:
   got_hot = 1
 }
 
-# Collect bytes: Plan 9 Cursor is offset + clr[32] + set[32]
 in_cursor {
   while (match($0, /0[xX][0-9A-Fa-f]+/)) {
     tok = substr($0, RSTART, RLENGTH)
@@ -104,18 +100,16 @@ in_cursor {
   }
 }
 
-# End of cursor block
+# end of cursor block
 in_cursor && /};/ {
   in_cursor = 0
 
-  # record encounter order if not already
   if (!(seen[cur]++)) {
     name_cnt++
     names[name_cnt] = cur
   }
 
   if (c1 < 32 || c2 < 32) {
-    # allow partial, but warn
     warn[cur] = 1
   }
 }
@@ -129,7 +123,7 @@ END {
     for (i=1; i<=name_cnt; i++) out[++outn] = names[i]
   }
 
-  print "/* generated from Plan 9 Cursor data */"
+  print "/* generated from plan 9 cursor data */"
   print "#include <stdint.h>"
   print "#include <stddef.h>"
   print ""
@@ -180,8 +174,7 @@ END {
     w = maxx - minx + 1
     h = maxy - miny + 1
 
-    # Plan 9 Cursor.offset is the top-left draw offset relative to the mouse.
-    # Therefore hotspot (the mouse point within the 16x16 bitmap) is -offset.
+    #offset hostspot
     xhot = -hx[n]
     yhot = -hy[n]
 
@@ -195,7 +188,6 @@ END {
     meta_hy[oi] = hy2
     meta_off[oi] = off
 
-    # emit cropped pixels row-major
     for (y=miny; y<=maxy; y++) {
       for (x=minx; x<=maxx; x++) {
         v = full[n,y,x]
