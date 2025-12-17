@@ -1,13 +1,13 @@
 #!/bin/sh
-# Convert Plan 9 Cursor definitions in a C file to packed ARGB cursor_data[] + cursor_metadata[].
-# Usage:
-#   ./p9cursor2rgba.sh 9cursors.c > out.c
-#   ./p9cursor2rgba.sh 9cursors.c tl t tr l r bl b br > out.c   # explicit order/subset
+# convert plan 9 cursor definitions in a C file to packed argb cursor_data[] + cursor_metadata[] for swc
+# asage:
+#   ./92h.sh 9cursors.c > out.c
+#   ./92h.sh 9cursors.c tl t tr l r bl b br > out.c   # explicit order/subset
 
 infile=${1:-/dev/stdin}
 shift 2>/dev/null || true
 
-# Remaining args are optional: desired cursor names in output order.
+# remaining args are optional, desired cursor names in output order.
 order="$*"
 
 awk -v ORDER="$order" '

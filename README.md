@@ -11,6 +11,10 @@ it's design is inspired by the ideas found in rob pike's 1988 paper, 'Window Sys
  there are no menus, and you are not limited to a single screen worth of space; you are able to infinitely
  scroll up and down, creating windows anywhere on the plane.
 
+it is implemented using the wonderful swc library, with a fair few extensions.
+
+hevel is the flagship window manager designed and implemented for use with [dérive linux](https://derivelinux.org)
+
 commands
 --------
 
@@ -20,6 +24,13 @@ commands are issued using mouse chords, meaning by pressing a combination of but
 - 1 -> 3 -> drag -> release -> creates a new terminal in the dragged box 
 - 3 -> 1 -> move mouse on top of target window -> release -> kill target window
 - 3 -> 2 -> release 2, and with your finger still on the scroll wheel, scroll up/down
+- 2 -> 3 -> release 2 on top of a window, and then drag with 3 to resize said window
+- 2 -> 1 -> release 2 on top of a window, and then drag with 1 to move said window. if you drag to the bottom/top of the screen, it will begin to scroll.
+
+other
+-----
+
+configuration can be done with config.h at compile time.
 
 
 
