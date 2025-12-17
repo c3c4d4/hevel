@@ -19,3 +19,8 @@ static const int32_t move_scroll_edge_threshold = 80;
 static const int32_t move_scroll_speed = 8;
 static const float move_ease_factor = 0.37f;
 
+/* cursor themes:
+ * - "swc"  : use swc's built-in cursor ,client cursors allowed, no per-chord cursor
+ * - "nein" : use the plan 9 cursor set, client cursors blocked, per chord cursors
+ */
+static const char *const cursor_theme = "nein";

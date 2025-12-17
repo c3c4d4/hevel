@@ -13,6 +13,7 @@
 #include <swc.h>
 
 #include "config.h"
+#include "nein_cursor.h"
 
 struct window {
 	struct swc_window *swc;
@@ -46,6 +47,7 @@ static struct {
 		int32_t move_start_cursor_x, move_start_cursor_y;
 		int32_t scroll_rem;
 		int32_t scroll_pending_px;
+		int8_t scroll_cursor_dir;
 		struct wl_event_source *scroll_timer;
 		struct swc_window *scroll_last;
 		struct swc_rectangle scroll_last_geo;
@@ -104,6 +106,61 @@ cursor_position(int32_t *x, int32_t *y)
 }
 
 static void
+update_mode_cursor(void)
+{
+	if (hevel.chord.killing)
+		swc_set_cursor(SWC_CURSOR_SIGHT);
+	else if (hevel.chord.scrolling) {
+		if (hevel.chord.scroll_cursor_dir < 0)
+			swc_set_cursor(SWC_CURSOR_UP);
+		else
+			swc_set_cursor(SWC_CURSOR_DOWN);
+	}
+	else if (hevel.chord.selecting)
+		swc_set_cursor(SWC_CURSOR_CROSS);
+	else if (hevel.chord.moving || hevel.chord.resize)
+		swc_set_cursor(SWC_CURSOR_BOX);
+	else
+		swc_set_cursor(SWC_CURSOR_DEFAULT);
+}
+
+static void
+maybe_enable_nein_cursor_theme(void)
+{
+	const struct nein_cursor_meta *arrow = &nein_cursor_metadata[NEIN_CURSOR_WHITEARROW];
+	const struct nein_cursor_meta *box = &nein_cursor_metadata[NEIN_CURSOR_BOXCURSOR];
+	const struct nein_cursor_meta *cross = &nein_cursor_metadata[NEIN_CURSOR_CROSSCURSOR];
+	const struct nein_cursor_meta *sight = &nein_cursor_metadata[NEIN_CURSOR_SIGHTCURSOR];
+	const struct nein_cursor_meta *up = &nein_cursor_metadata[NEIN_CURSOR_T];
+	const struct nein_cursor_meta *down = &nein_cursor_metadata[NEIN_CURSOR_B];
+
+	if (!cursor_theme || strcmp(cursor_theme, "nein") != 0)
+		return;
+
+	swc_set_cursor_mode(SWC_CURSOR_MODE_COMPOSITOR);
+	swc_set_cursor_image(SWC_CURSOR_DEFAULT, &nein_cursor_data[arrow->offset],
+	                     arrow->width, arrow->height,
+	                     arrow->hotspot_x, arrow->hotspot_y);
+	swc_set_cursor_image(SWC_CURSOR_BOX, &nein_cursor_data[box->offset],
+	                     box->width, box->height,
+	                     box->hotspot_x, box->hotspot_y);
+	swc_set_cursor_image(SWC_CURSOR_CROSS, &nein_cursor_data[cross->offset],
+	                     cross->width, cross->height,
+	                     cross->hotspot_x, cross->hotspot_y);
+	swc_set_cursor_image(SWC_CURSOR_SIGHT, &nein_cursor_data[sight->offset],
+	                     sight->width, sight->height,
+	                     sight->hotspot_x, sight->hotspot_y);
+	swc_set_cursor_image(SWC_CURSOR_UP, &nein_cursor_data[up->offset],
+	                     up->width, up->height,
+	                     up->hotspot_x, up->hotspot_y);
+	swc_set_cursor_image(SWC_CURSOR_DOWN, &nein_cursor_data[down->offset],
+	                     down->width, down->height,
+	                     down->hotspot_x, down->hotspot_y);
+
+	update_mode_cursor();
+}
+
+static void
 stop_select(void)
 {
 	if(hevel.chord.timer){
@@ -112,6 +169,7 @@ stop_select(void)
 	}
 	hevel.chord.selecting = false;
 	swc_overlay_clear();
+	update_mode_cursor();
 }
 
 static int scroll_tick(void *data);
@@ -209,6 +267,8 @@ spawn_term_select(const struct swc_rectangle *geometry)
 	}
 }
 
+static void click_cancel(void);
+
 static int
 click_timeout(void *data)
 {
@@ -216,6 +276,12 @@ click_timeout(void *data)
 
 	if(!hevel.chord.click.pending)
 		return 0;
+
+	/* don't forward clicks while move chord is active */
+	if (hevel.chord.moving) {
+		click_cancel();
+		return 0;
+	}
 
 	if(hevel.chord.left && hevel.chord.right)
 		return 0;
@@ -317,6 +383,10 @@ axis(void *data, uint32_t time, uint32_t axis, int32_t value120)
 
 	(void)data;
 
+	/* while moving a window swallow scroll events so they don't reach clients */
+	if (hevel.chord.moving)
+		return;
+
 	if (!hevel.chord.scrolling) {
 		if (debugscroll)
 			fprintf(stderr, "[scroll] forward axis=%u value120=%d (not scrolling)\n", axis, value120);
@@ -330,6 +400,9 @@ axis(void *data, uint32_t time, uint32_t axis, int32_t value120)
 		swc_pointer_send_axis(time, axis, value120);
 		return;
 	}
+
+	hevel.chord.scroll_cursor_dir = value120 < 0 ? -1 : 1;
+	update_mode_cursor();
 
 	/* preserve sub-step precision for dat smooth, smooth scrolling */
 	int64_t dy_num = (int64_t)hevel.chord.scroll_rem + (int64_t)value120 * (int64_t)scrollpx;
@@ -523,6 +596,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 				swc_window_close(target);
 		}
 		hevel.chord.killing = false;
+		update_mode_cursor();
 		if (!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
 			hevel.chord.activated = false;
 		return;
@@ -533,6 +607,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		stop_select();
 		hevel.chord.activated = true;
 		hevel.chord.killing = true;
+		update_mode_cursor();
 		return;
 	}
 	
@@ -541,6 +616,8 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		stop_select();
 		hevel.chord.activated = true;
 		hevel.chord.scrolling = true;
+		hevel.chord.scroll_cursor_dir = -1;
+		update_mode_cursor();
 		scroll_stop();
 		if (debugscroll)
 			fprintf(stderr, "[scroll] start\n");
@@ -552,6 +629,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		stop_select();
 		hevel.chord.activated = true;
 		hevel.chord.moving = true;
+		update_mode_cursor();
 
 		/* get starting pos to be used for easing calculation*/
 		if(hevel.focused && cursor_position(&x, &y)){
@@ -575,6 +653,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 	if (b == BTN_LEFT && !pressed && hevel.chord.moving == true) {
 		hevel.chord.moving = false;
+		update_mode_cursor();
 
 		/* stop timer */
 		if(hevel.chord.move_scroll_timer){
@@ -593,6 +672,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		stop_select();
 		hevel.chord.activated = true;
 		hevel.chord.resize = true;
+		update_mode_cursor();
 
 		if (hevel.focused)
 			/* bottom right */
@@ -603,6 +683,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 	if (b == BTN_RIGHT && !pressed && hevel.chord.resize == true) {
 		hevel.chord.resize = false;
+		update_mode_cursor();
 
 		if (hevel.focused)
 			swc_window_end_resize(hevel.focused);
@@ -633,6 +714,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		hevel.chord.activated = true;
 		if(cursor_position(&x, &y)){
 			hevel.chord.selecting = true;
+			update_mode_cursor();
 			hevel.chord.start_x = x;
 			hevel.chord.start_y = y;
 			hevel.chord.cur_x = x;
@@ -647,8 +729,11 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 	/* while a chord is active swallow left/right events so they don't go to clients */
 	if(is_chord_button && hevel.chord.activated && !hevel.chord.selecting){
+		bool was_scrolling = hevel.chord.scrolling;
 		if (!hevel.chord.right)
 			hevel.chord.scrolling = false;
+		if (was_scrolling && !hevel.chord.scrolling)
+			update_mode_cursor();
 		if (!hevel.chord.scrolling) {
 			if (debugscroll)
 				fprintf(stderr, "[scroll] stop\n");
@@ -660,6 +745,8 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 	}
 
 	if (b == BTN_MIDDLE) {
+		if (hevel.chord.moving)
+			return;
 		swc_pointer_send_button(time, b, state);
 		return;
 	}
@@ -770,10 +857,13 @@ main(void)
 
 	evloop = wl_display_get_event_loop(hevel.display);
 	hevel.evloop = evloop;
+
 	if(!swc_initialize(hevel.display, evloop, &manager)){
 		fprintf(stderr, "cannot initialize swc\n");
 		return 1;
 	}
+
+	maybe_enable_nein_cursor_theme();
 
 	swc_add_binding(SWC_BINDING_KEY, SWC_MOD_LOGO | SWC_MOD_SHIFT,
 	                XKB_KEY_q, quit, NULL);
