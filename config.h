@@ -1,3 +1,11 @@
+//#define USE_IMAGE true
+
+#ifdef USE_IMAGE
+	static char* imgpath = "/home/dalem/wallpapers/wydmy.png";
+#endif 
+
+static const uint32_t background_color = 0xFF787878;
+
 static const uint32_t outer_border_color_inactive = 0xff525252;
 static const uint32_t inner_border_color_inactive = 0xff85b3d6;
 
