@@ -1,7 +1,7 @@
-//#define USE_IMAGE true
+#define USE_IMAGE true
 
 #ifdef USE_IMAGE
-	static char* imgpath = "/home/dalem/wallpapers/wydmy.png";
+	static char* imgpath = "/home/srb/Downloads/2.png";
 #endif 
 
 static const uint32_t background_color = 0xFF787878;
@@ -12,8 +12,8 @@ static const uint32_t inner_border_color_inactive = 0xff85b3d6;
 static const uint32_t outer_border_color_active = 0xff222222;
 static const uint32_t inner_border_color_active = 0xff285577;
 
-static const uint32_t outer_border_width = 2;
-static const uint32_t inner_border_width = 2;
+static const uint32_t outer_border_width = 0;
+static const uint32_t inner_border_width = 4;
 
 static const uint32_t select_box_color = 0xffffffff;
 static const uint32_t select_box_border = 2;
