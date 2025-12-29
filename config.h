@@ -24,8 +24,8 @@ static const char *const term = "havoc";
 static const int chord_click_timeout_ms = 125;
 
 static const int32_t move_scroll_edge_threshold = 80;
-static const int32_t move_scroll_speed = 8;
-static const float move_ease_factor = 0.37f;
+static const int32_t move_scroll_speed = 16;
+static const float move_ease_factor = 0.30f;
 
 /* cursor themes:
  * - "swc"  : use swc's built-in cursor ,client cursors allowed, no per-chord cursor
