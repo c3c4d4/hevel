@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="hevel">
+    <copyright>
+        lul lmao, diz 4 hevel x3 rawr
+    </copyright>
+
+    <interface name="hevel_scroll" version="1">
+        <description summary="the current positon in the infinite scrolling plane">
+            Hevel is a scrolling window manager, it has an inifnite vertical space.
+        </description>
+
+		<event name="get_pos">
+			<arg name="pos" type="int"/>
+		</event>
+    </interface>
+</protocol>
