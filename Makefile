@@ -52,6 +52,12 @@ $(SWC_DIR)/protocol/swc_snap-client-protocol.h: $(SWC_DIR)/protocol/swc_snap.xml
 $(SWC_DIR)/protocol/swc_snap-protocol.c: $(SWC_DIR)/protocol/swc_snap.xml
 	wayland-scanner code < $(SWC_DIR)/protocol/swc_snap.xml > $(SWC_DIR)/protocol/swc_snap-protocol.c
 
+$(SWC_DIR)/protocol/swc-client-protocol.h: $(SWC_DIR)/protocol/swc.xml
+	wayland-scanner client-header < $(SWC_DIR)/protocol/swc.xml > $(SWC_DIR)/protocol/swc-client-protocol.h
+
+$(SWC_DIR)/protocol/swc-client-protocol.c: $(SWC_DIR)/protocol/swc.xml
+	wayland-scanner public-code < $(SWC_DIR)/protocol/swc.xml > $(SWC_DIR)/protocol/swc-client-protocol.c
+
 swcsnap: swcsnap.o $(SWC_DIR)/protocol/swc_snap-protocol.o
 	$(CC) $(LDFLAGS) -o swcsnap swcsnap.o $(SWC_DIR)/protocol/swc_snap-protocol.o $(SNAP_CLIENT_LDLIBS)
 
@@ -73,14 +79,14 @@ $(PROTO_HEVEL_SERVER_H) $(PROTO_HEVEL_CLIENT_H) $(PROTO_HEVEL_SERVER_C): $(PROTO
 $(PROTO_HEVEL_CLIENT_O): $(PROTO_HEVEL_CLIENT_C) $(PROTO_HEVEL_CLIENT_H)
 	$(CC) $(HBAR_CFLAGS) -c $(PROTO_HEVEL_CLIENT_C) -o $(PROTO_HEVEL_CLIENT_O)
 
-hbar: $(HBAR_O) $(PROTO_HEVEL_CLIENT_O) $(SWC_DIR)/$(PROTO_DIR)/swc-client-protocol.o
-	$(CC) $(LDFLAGS) -o hbar $(HBAR_O) $(PROTO_HEVEL_CLIENT_O) $(SWC_DIR)/$(PROTO_DIR)/swc-client-protocol.o $(HBAR_LDLIBS)
+hbar: $(HBAR_O) $(PROTO_HEVEL_CLIENT_O) $(SWC_DIR)/protocol/swc-client-protocol.o
+	$(CC) $(LDFLAGS) -o hbar $(HBAR_O) $(PROTO_HEVEL_CLIENT_O) $(SWC_DIR)/protocol/swc-client-protocol.o $(HBAR_LDLIBS)
 
-$(HBAR_O): $(PROTO_HEVEL_CLIENT_O) $(SWC_DIR)/$(PROTO_DIR)/swc-client-protocol.h
+$(HBAR_O): $(PROTO_HEVEL_CLIENT_O) $(SWC_DIR)/protocol/swc-client-protocol.h
 	$(CC) $(HBAR_CFLAGS) -c $(HBAR_C) -o $(HBAR_O)
 
-$(SWC_DIR)/$(PROTO_DIR)/swc-client-protocol.o:
-	$(CC) $(HBAR_CFLAGS) -c $(SWC_DIR)/$(PROTO_DIR)/swc-client-protocol.c -o $(SWC_DIR)/$(PROTO_DIR)/swc-client-protocol.o
+$(SWC_DIR)/protocol/swc-client-protocol.o: $(SWC_DIR)/protocol/swc-client-protocol.c $(SWC_DIR)/protocol/swc-client-protocol.h
+	$(CC) $(HBAR_CFLAGS) -c $(SWC_DIR)/protocol/swc-client-protocol.c -o $(SWC_DIR)/protocol/swc-client-protocol.o
 
 FORCE:
 
@@ -88,9 +94,10 @@ $(SWC_LIB): FORCE
 	$(MAKE) -C $(SWC_DIR)
 
 clean:
-	rm -f hevel hevel.o 
-	rm -f $(PROTO_HEVEL_SERVER_H) $(PROTO_HEVEL_CLIENT_H) $(PROTO_HEVEL_SERVER_C) $(PROTO_HEVEL_CLIENT_C) $(PROTO_HEVEL_SERVER_O)
+	rm -f hevel hevel.o
+	rm -f $(PROTO_HEVEL_SERVER_H) $(PROTO_HEVEL_CLIENT_H) $(PROTO_HEVEL_SERVER_C) $(PROTO_HEVEL_CLIENT_C) $(PROTO_HEVEL_SERVER_O) $(PROTO_HEVEL_CLIENT_O)
 	rm -f $(SWC_DIR)/protocol/swc_snap-protocol.o $(SWC_DIR)/protocol/swc_snap-client-protocol.h
+	rm -f $(SWC_DIR)/protocol/swc-client-protocol.o $(SWC_DIR)/protocol/swc-client-protocol.h $(SWC_DIR)/protocol/swc-client-protocol.c
 	rm -f swcsnap swcsnap.o
 	rm -f hbar extra/hbar/hbar.o
 	$(MAKE) -C $(SWC_DIR) clean

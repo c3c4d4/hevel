@@ -6,8 +6,7 @@ libswc/swc.o libswc/swc.lo: libswc/swc.c libswc/swc.h libswc/bindings.h \
  libswc/panel_manager.h libswc/pointer.h libswc/screen.h \
  libswc/primary_plane.h libswc/mode.h libswc/seat.h libswc/shell.h \
  libswc/shm.h libswc/snap.h libswc/subcompositor.h libswc/util.h \
- libswc/window.h libswc/xdg_decoration.h libswc/xdg_shell.h \
- libswc/xserver.h
+ libswc/window.h libswc/xdg_decoration.h libswc/xdg_shell.h
 libswc/swc.h:
 libswc/bindings.h:
 libswc/compositor.h:
@@ -36,4 +35,3 @@ libswc/util.h:
 libswc/window.h:
 libswc/xdg_decoration.h:
 libswc/xdg_shell.h:
-libswc/xserver.h:
