@@ -70,9 +70,9 @@ $(SWC_DIR)/protocol/swc_snap-protocol.o: $(SWC_DIR)/protocol/swc_snap-protocol.c
 $(PROTO_HEVEL_SERVER_O): $(PROTO_HEVEL_SERVER_C) $(PROTO_HEVEL_SERVER_H)
 	$(CC) $(CFLAGS) -c $(PROTO_HEVEL_SERVER_C) -o $(PROTO_HEVEL_SERVER_O)
 
-$(PROTO_HEVEL_SERVER_H) $(PROTO_HEVEL_CLIENT_H) $(PROTO_HEVEL_SERVER_C): $(PROTO_HEVEL)
-	wayland-scanner server-header $(PROTO_HEVEL) $(PROTO_HEVEL_SERVER_H) 
-	wayland-scanner client-header $(PROTO_HEVEL) $(PROTO_HEVEL_CLIENT_H) 
+$(PROTO_HEVEL_SERVER_H) $(PROTO_HEVEL_CLIENT_H) $(PROTO_HEVEL_SERVER_C) $(PROTO_HEVEL_CLIENT_C): $(PROTO_HEVEL)
+	wayland-scanner server-header $(PROTO_HEVEL) $(PROTO_HEVEL_SERVER_H)
+	wayland-scanner client-header $(PROTO_HEVEL) $(PROTO_HEVEL_CLIENT_H)
 	wayland-scanner private-code $(PROTO_HEVEL) $(PROTO_HEVEL_SERVER_C)
 	wayland-scanner public-code $(PROTO_HEVEL) $(PROTO_HEVEL_CLIENT_C)
 
