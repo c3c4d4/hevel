@@ -47,6 +47,7 @@ static struct {
 		bool activated;
 		bool killing;
 		bool scrolling;
+		bool auto_scrolling;
 		bool moving;
 		bool resize;
 		int32_t move_start_win_x, move_start_win_y;
@@ -76,6 +77,9 @@ static struct {
 		} spawn;
 	} chord;
 } hevel;
+
+static int scroll_tick(void *data);
+static void scroll_stop(void);
 
 static void
 remove_resource(struct wl_resource *resource)
@@ -134,6 +138,33 @@ focus_window(struct swc_window *swc, const char *reason)
 		swc_window_set_border(swc, inner_border_color_active, inner_border_width, outer_border_color_active, outer_border_width);
 
 	hevel.focused = swc;
+
+	/* center the focused window */
+	if (swc && !wl_list_empty(&hevel.screens)) {
+		struct swc_rectangle window_geom;
+		struct screen *screen = wl_container_of(hevel.screens.next, screen, link);
+
+		if (swc_window_get_geometry(swc, &window_geom)) {
+			int32_t window_center_y = window_geom.y + (int32_t)window_geom.height / 2;
+			int32_t screen_center_y = screen->swc->geometry.y + (int32_t)screen->swc->geometry.height / 2;
+			int32_t scroll_delta = screen_center_y - window_center_y;
+
+			if (scroll_delta != 0) {
+				/* stop scroll before auto-scroll */
+				scroll_stop();
+
+				hevel.chord.scroll_pending_px = scroll_delta;
+				hevel.chord.scroll_rem = 0;
+				hevel.chord.auto_scrolling = true;
+
+				if (!hevel.chord.scroll_timer) {
+					hevel.chord.scroll_timer = wl_event_loop_add_timer(
+						hevel.evloop, scroll_tick, NULL);
+				}
+				wl_event_source_timer_update(hevel.chord.scroll_timer, scrollms);
+			}
+		}
+	}
 }
 
 static bool
@@ -356,6 +387,7 @@ scroll_stop(void)
 	hevel.chord.scroll_rem = 0;
 	hevel.chord.scroll_last = NULL;
 	hevel.chord.scroll_last_step = 0;
+	hevel.chord.auto_scrolling = false;
 }
 
 static int
@@ -375,9 +407,9 @@ scroll_tick(void *data)
 		return 0;
 	}
 
-	if ((!hevel.chord.scrolling && !hevel.chord.moving) || rem == 0) {
+	if ((!hevel.chord.scrolling && !hevel.chord.auto_scrolling && !hevel.chord.moving) || rem == 0) {
 		if (debugscroll && tickno % 10 == 0)
-			fprintf(stderr, "[scroll] tick stop scrolling=%d moving=%d rem=%d\n", hevel.chord.scrolling, hevel.chord.moving, rem);
+			fprintf(stderr, "[scroll] tick stop scrolling=%d auto_scrolling=%d moving=%d rem=%d\n", hevel.chord.scrolling, hevel.chord.auto_scrolling, hevel.chord.moving, rem);
 		scroll_stop();
 		return 0;
 	}
@@ -394,7 +426,7 @@ scroll_tick(void *data)
 		fprintf(stderr, "[scroll] tick rem=%d step=%d pending=%d last=%p\n",
 		        rem, step, hevel.chord.scroll_pending_px, (void *)hevel.chord.scroll_last);
 	}
-	
+
 	scrollpos += step;
 	send_scrollpos();
 
@@ -746,6 +778,12 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 	if (pressed && is_lr && !hevel.chord.selecting) {
 		bool other_down = (b == BTN_LEFT) ? was_right : was_left;
+
+		/* stop auto-scrolling on any clics */
+		if (hevel.chord.auto_scrolling) {
+			hevel.chord.auto_scrolling = false;
+			scroll_stop();
+		}
 
 		if (!other_down && cursor_position(&x, &y)) {
 			struct swc_window *target = swc_window_at(x, y);
