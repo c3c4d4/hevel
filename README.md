@@ -29,6 +29,7 @@ commands are issued using mouse chords, meaning by pressing a combination of but
 
 other
 -----
+you will need the michaelforney/wld library from github installed to build hevel.
 
 configuration can be done with config.h at compile time.
 

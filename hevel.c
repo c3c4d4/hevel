@@ -20,6 +20,14 @@
 struct window {
 	struct swc_window *swc;
 	struct wl_list link;
+
+	/* term spawn prims */
+	pid_t pid;
+	struct window *spawn_parent;
+	struct wl_list spawn_children;
+	struct wl_list spawn_link;
+	bool hidden_for_spawn;
+	struct swc_rectangle saved_geometry;
 };
 
 struct screen {
@@ -145,6 +153,10 @@ focus_window(struct swc_window *swc, const char *reason)
 		struct screen *screen = wl_container_of(hevel.screens.next, screen, link);
 
 		if (swc_window_get_geometry(swc, &window_geom)) {
+			/* skip if window has no size yet (not configured by client) */
+			if (window_geom.width == 0 || window_geom.height == 0)
+				return;
+
 			int32_t window_center_y = window_geom.y + (int32_t)window_geom.height / 2;
 			int32_t screen_center_y = screen->swc->geometry.y + (int32_t)screen->swc->geometry.height / 2;
 			int32_t scroll_delta = screen_center_y - window_center_y;
@@ -523,6 +535,33 @@ static void
 windowdestroy(void *data)
 {
 	struct window *w = data;
+
+	/* cleanup for term spawn*/
+	if (w->spawn_parent) {
+		struct window *terminal = w->spawn_parent;
+
+		wl_list_remove(&w->spawn_link);
+
+		if (wl_list_empty(&terminal->spawn_children) && terminal->hidden_for_spawn) {
+			/* restore term */
+			swc_window_show(terminal->swc);
+			swc_window_set_geometry(terminal->swc, &terminal->saved_geometry);
+			terminal->hidden_for_spawn = false;
+
+			/* focus terminal */
+			focus_window(terminal->swc, "spawn_child_destroyed");
+		}
+	}
+
+	if (!wl_list_empty(&w->spawn_children)) {
+		struct window *child, *tmp;
+		wl_list_for_each_safe(child, tmp, &w->spawn_children, spawn_link) {
+			child->spawn_parent = NULL;
+			wl_list_remove(&child->spawn_link);
+			wl_list_init(&child->spawn_link);
+		}
+	}
+
 	if (hevel.chord.scroll_last == w->swc)
 		hevel.chord.scroll_last = NULL;
 	if(hevel.focused == w->swc)
@@ -583,6 +622,76 @@ newscreen(struct swc_screen *swc)
 	printf("screen %dx%d\n", swc->geometry.width, swc->geometry.height);
 }
 
+/* helpers for pid*/
+static pid_t
+get_parent_pid(pid_t pid)
+{
+	char path[64];
+	FILE *f;
+	pid_t parent_pid = 0;
+
+	snprintf(path, sizeof(path), "/proc/%d/stat", pid);
+	f = fopen(path, "r");
+	if (!f)
+		return 0;
+
+	/* its like: pid (comm) state ppid ... */
+	fscanf(f, "%*d %*s %*c %d", &parent_pid);
+	fclose(f);
+	return parent_pid;
+}
+
+static struct window *
+find_window_by_pid(pid_t pid)
+{
+	struct window *w;
+
+	wl_list_for_each(w, &hevel.windows, link) {
+		if (w->pid == pid)
+			return w;
+	}
+	return NULL;
+}
+
+static bool
+is_terminal_window(struct window *w)
+{
+	if (!w || !w->swc)
+		return false;
+
+	/* check app_id */
+	if (w->swc->app_id) {
+		for (const char *const *term = terminal_app_ids; *term; term++) {
+			if (strstr(w->swc->app_id, *term))
+				return true;
+		}
+	}
+
+	/* check title too, because, paranoia */
+	if (w->swc->title) {
+		for (const char *const *term = terminal_app_ids; *term; term++) {
+			if (strstr(w->swc->title, *term))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+static void
+mk_spawn_link(struct window *terminal, struct window *child)
+{
+	child->spawn_parent = terminal;
+	wl_list_insert(&terminal->spawn_children, &child->spawn_link);
+
+	/* save term geom */
+	if (swc_window_get_geometry(terminal->swc, &terminal->saved_geometry)) {
+		terminal->hidden_for_spawn = true;
+		swc_window_hide(terminal->swc);
+		swc_window_set_geometry(child->swc, &terminal->saved_geometry);
+	}
+}
+
 static void
 newwindow(struct swc_window *swc)
 {
@@ -596,10 +705,49 @@ newwindow(struct swc_window *swc)
 	if(!w)
 		return;
 	w->swc = swc;
+	w->pid = 0;
+	w->spawn_parent = NULL;
+	wl_list_init(&w->spawn_children);
+	wl_list_init(&w->spawn_link);
+	w->hidden_for_spawn = false;
+
 	wl_list_insert(&hevel.windows, &w->link);
 	swc_window_set_handler(swc, &windowhandler, w);
 	swc_window_set_stacked(swc);
 	swc_window_set_border(swc, inner_border_color_inactive, inner_border_width, outer_border_color_inactive, outer_border_width);
+
+	/* get pid and check conf for term spawn */
+	if (enable_terminal_spawning) {
+		w->pid = swc_window_get_pid(swc);
+
+		if (w->pid > 0) {
+			/* im so fucking dumb, we need to walk up the proc tree to get the term, otherwise we just get the shell */
+			pid_t current_pid = w->pid;
+			struct window *terminal = NULL;
+			int depth = 0;
+
+			/* walk up 10 levels */
+			while (depth < 10 && current_pid > 1) {
+				pid_t parent_pid = get_parent_pid(current_pid);
+				if (parent_pid <= 1)
+					break;
+
+				/* check pid against term*/
+				struct window *candidate = find_window_by_pid(parent_pid);
+				if (candidate && is_terminal_window(candidate)) {
+					terminal = candidate;
+					break;
+				}
+
+				current_pid = parent_pid;
+				depth++;
+			}
+
+			if (terminal)
+				mk_spawn_link(terminal, w);
+		}
+	}
+
 	if(is_select){
 		geometry = hevel.chord.spawn.geometry;
 		if(geometry.width < 50)
@@ -785,7 +933,8 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 			scroll_stop();
 		}
 
-		if (!other_down && cursor_position(&x, &y)) {
+		/* only left button focuses windows */
+		if (b == BTN_LEFT && !other_down && cursor_position(&x, &y)) {
 			struct swc_window *target = swc_window_at(x, y);
 
 			if (target)

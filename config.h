@@ -6,13 +6,13 @@
 
 static const uint32_t background_color = 0xFF787878;
 
-static const uint32_t outer_border_color_inactive = 0xff525252;
-static const uint32_t inner_border_color_inactive = 0xff85b3d6;
+static const uint32_t outer_border_color_inactive = 0xffffffea;
+static const uint32_t inner_border_color_inactive = 0xffddbd8c;
 
-static const uint32_t outer_border_color_active = 0xff222222;
-static const uint32_t inner_border_color_active = 0xff285577;
+static const uint32_t outer_border_color_active = 0xffffffea;
+static const uint32_t inner_border_color_active = 0xffc99043;
 
-static const uint32_t outer_border_width = 0;
+static const uint32_t outer_border_width = 4;
 static const uint32_t inner_border_width = 4;
 
 static const uint32_t select_box_color = 0xffffffff;
@@ -32,3 +32,11 @@ static const float move_ease_factor = 0.30f;
  * - "nein" : use the plan 9 cursor set, client cursors blocked, per chord cursors
  */
 static const char *const cursor_theme = "nein";
+
+static const bool enable_terminal_spawning = true;
+
+static const char *const terminal_app_ids[] = {
+	"havoc",
+	"alacritty",
+	NULL
+};
