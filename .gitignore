@@ -1,7 +1,11 @@
 velox
 wld
+hbar
+swcsnap
 hevel
 hevel.o
+*.ppm
+*.mp4
 *.o
 *.a
 swc/cursor/convert_font
