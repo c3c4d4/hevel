@@ -31,6 +31,17 @@ other
 -----
 you will need the michaelforney/wld library from github installed to build hevel.
 
+to build:
+
+```
+make
+make install
+cd swc
+make install
+```
+
+keep in mind this is EXPERIMENTAL SOFTWARE!
+
 configuration can be done with config.h at compile time.
 
 
