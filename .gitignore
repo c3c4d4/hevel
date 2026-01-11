@@ -10,3 +10,5 @@ swc/swc.pc
 swc/protocol/*-protocol.c
 swc/protocol/*-protocol.h
 swc/cursor/cursor_data.h
+*.mp4
+*.ppm
