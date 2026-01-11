@@ -35,6 +35,12 @@ static const char *const cursor_theme = "nein";
 
 static const bool enable_terminal_spawning = true;
 
+/* scroll chord mode:
+ * - true  : drag mouse to scroll in any direction
+ * - false : use scroll wheel for vertical scrolling only
+ */
+static const bool scroll_drag_mode = true;
+
 static const char *const terminal_app_ids[] = {
 	"havoc",
 	"alacritty",
