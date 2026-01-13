@@ -198,6 +198,12 @@ cursor_position(int32_t *x, int32_t *y)
 	return true;
 }
 
+static bool
+is_acme(const struct swc_window *swc)
+{
+	return swc && swc->app_id && strcmp(swc->app_id, "acme") == 0;
+}
+
 static void
 update_mode_cursor(void)
 {
@@ -832,6 +838,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 	bool was_right = hevel.chord.right;
 	bool is_lr;
 	bool is_chord_button;
+	bool acme_passthrough = false;
 
 	(void)data;
 	(void)time;
@@ -860,6 +867,22 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 	is_lr = (b == BTN_LEFT || b == BTN_RIGHT);
 	is_chord_button = (is_lr || b == BTN_MIDDLE);
+
+	if (cursor_position(&x, &y)) {
+		struct swc_window *target = swc_window_at(x, y);
+		if (is_acme(target))
+			acme_passthrough = true;
+	}
+
+	/* allow 1-3 chord to go to acme specifically */
+	if (acme_passthrough && is_lr && pressed) {
+		bool other_down = (b == BTN_LEFT) ? was_right : was_left;
+
+		if (other_down) {
+			swc_pointer_send_button(time, b, state);
+			return;
+		}
+	}
 	
 	if (b == BTN_LEFT && !pressed && hevel.chord.killing) {
 		if (cursor_position(&x, &y)) {
@@ -875,7 +898,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		return;
 	}
 
-	if (b == BTN_LEFT && pressed && was_right && !hevel.chord.activated) {
+	if (b == BTN_LEFT && pressed && was_right && !hevel.chord.activated && !acme_passthrough) {
 		click_cancel();
 		stop_select();
 		hevel.chord.activated = true;
@@ -910,7 +933,8 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		return;
 	}
 
-	if (b == BTN_MIDDLE && !pressed && was_left && ! hevel.chord.activated && !hevel.chord.selecting) {
+	if (b == BTN_MIDDLE && !pressed && was_left && ! hevel.chord.activated &&
+	    !hevel.chord.selecting && !acme_passthrough) {
 		click_cancel();
 		stop_select();
 		hevel.chord.activated = true;
@@ -934,6 +958,9 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		if(hevel.chord.move_scroll_timer)
 			wl_event_source_timer_update(hevel.chord.move_scroll_timer, 16);
 
+		/* forward the release so clients dont see stuck */
+		swc_pointer_send_button(time, b, state);
+
 		return;
 	}
 
@@ -949,6 +976,9 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 		if (!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
 			hevel.chord.activated = false;
+		
+		/* forward the release so clients dont see stuk */
+		swc_pointer_send_button(time, b, state);
 
 		return;
 	}
@@ -964,6 +994,10 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 			/* bottom right */
 			swc_window_begin_resize(hevel.focused, SWC_WINDOW_EDGE_RIGHT | SWC_WINDOW_EDGE_BOTTOM);
 
+		
+		/* forward the middle release so clients don't see it stuck */
+		swc_pointer_send_button(time, b, state);
+
 		return;
 	}
 
@@ -976,6 +1010,9 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 		if (!hevel.chord.left && !hevel.chord.middle && !hevel.chord.right)
 			hevel.chord.activated = false;
+
+		/* let clients see the release we swallowed */
+		swc_pointer_send_button(time, b, state);
 
 		return;
 	}
@@ -1002,7 +1039,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		}
 	}
 
-	if(hevel.chord.left && hevel.chord.right && !hevel.chord.activated){
+	if(hevel.chord.left && hevel.chord.right && !hevel.chord.activated && !acme_passthrough){
 		click_cancel();
 		hevel.chord.activated = true;
 		if(cursor_position(&x, &y)){
