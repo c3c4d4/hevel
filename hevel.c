@@ -870,7 +870,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 
 	if (cursor_position(&x, &y)) {
 		struct swc_window *target = swc_window_at(x, y);
-		if (is_acme(target))
+		if (is_acme(target) && target == hevel.focused)
 			acme_passthrough = true;
 	}
 
