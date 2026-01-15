@@ -28,6 +28,7 @@ struct window {
 	struct wl_list spawn_link;
 	bool hidden_for_spawn;
 	struct swc_rectangle saved_geometry;
+	bool sticky;
 };
 
 struct screen {
@@ -361,7 +362,7 @@ spawn_term_select(const struct swc_rectangle *geometry)
 
 	pid = fork();
 	if(pid == 0){
-		execlp(term, term, "-i", select_term_app_id, NULL);
+		execlp(term, term, term_flag, select_term_app_id, NULL);
 		_exit(127);
 	}
 }
@@ -480,6 +481,10 @@ scroll_tick(void *data)
 				fprintf(stderr, "[scroll] window node with null swc\n");
 			continue;
 		}
+
+		if (w->sticky)
+			continue;
+
 		/* when scroll with moving window, dont scroll the moving window, it makes it all jittery and ew */
 		if (hevel.chord.moving && w->swc == hevel.focused)
 			continue;
@@ -763,6 +768,7 @@ newwindow(struct swc_window *swc)
 	wl_list_init(&w->spawn_children);
 	wl_list_init(&w->spawn_link);
 	w->hidden_for_spawn = false;
+	w->sticky = false;
 
 	wl_list_insert(&hevel.windows, &w->link);
 	swc_window_set_handler(swc, &windowhandler, w);
@@ -836,6 +842,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 	struct swc_rectangle geometry;
 	bool was_left = hevel.chord.left;
 	bool was_right = hevel.chord.right;
+	bool was_middle = hevel.chord.middle;
 	bool is_lr;
 	bool is_chord_button;
 	bool acme_passthrough = false;
@@ -1014,6 +1021,26 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		/* let clients see the release we swallowed */
 		swc_pointer_send_button(time, b, state);
 
+		return;
+	}
+
+	if (b == BTN_LEFT && pressed && was_middle && !hevel.chord.activated) {
+		click_cancel();
+		stop_select();
+		
+#ifdef STICKY
+		if (hevel.focused) {
+			struct window *w;
+			wl_list_for_each(w, &hevel.windows, link) {
+				if (w->swc == hevel.focused) {
+					w->sticky = !w->sticky;
+					break;
+				}
+			}
+		}
+#endif
+		hevel.chord.activated = true;
+		swc_pointer_send_button(time, b, state);
 		return;
 	}
 	
