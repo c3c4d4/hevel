@@ -44,7 +44,9 @@ keep in mind this is EXPERIMENTAL SOFTWARE!
 
 linux support is first-class, netbsd works too but you may have to twiddle with makefiles a bit, sorry.
 
-configuration can be done with config.h at compile time.
+depending on your needs, you might want to tweak swc/config.mk as well.
+
+hevel-specific configuration can be done with config.h at compile time.
 
 
 
