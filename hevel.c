@@ -8,7 +8,16 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <wayland-server.h>
+
+#ifdef __linux__
 #include <linux/input-event-codes.h>
+/* netbsd */
+#else
+#define BTN_LEFT    0x110
+#define BTN_RIGHT   0x111
+#define BTN_MIDDLE  0x112
+#endif
+
 #include <xkbcommon/xkbcommon-keysyms.h>
 #include <swc.h>
 

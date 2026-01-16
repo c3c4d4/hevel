@@ -42,6 +42,8 @@ make install
 
 keep in mind this is EXPERIMENTAL SOFTWARE!
 
+linux support is first-class, netbsd works too but you may have to twiddle with makefiles a bit, sorry.
+
 configuration can be done with config.h at compile time.
 
 
