@@ -103,9 +103,9 @@ clean:
 	$(MAKE) -C $(SWC_DIR) clean
 
 install: hevel
+	install -D -m 4755 $(SWC_DIR)/launch/swc-launch $(DESTDIR)$(BINDIR)/swc-launch
 	install -D -m 755 hevel $(DESTDIR)$(BINDIR)/hevel
 	install -D -m 755 swcsnap $(DESTDIR)$(BINDIR)/swcsnap
 	install -D -m 755 hbar $(DESTDIR)$(BINDIR)/hbar
-	install -D -m 4755 $(SWC_DIR)/launch/swc-launch $(DESTDIR)$(BINDIR)/swc-launch
-
+	
 .PHONY: clean install FORCE
