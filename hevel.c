@@ -160,7 +160,7 @@ focus_window(struct swc_window *swc, const char *reason)
 	hevel.focused = swc;
 
 	/* center the focused window on both axes */
-	if (swc && !wl_list_empty(&hevel.screens)) {
+	if (focus_center == true && scroll_drag_mode == true && swc && !wl_list_empty(&hevel.screens)) {
 		struct swc_rectangle window_geom;
 		struct screen *screen = wl_container_of(hevel.screens.next, screen, link);
 
@@ -1037,7 +1037,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		click_cancel();
 		stop_select();
 		
-#ifdef STICKY
+		#ifdef STICKY
 		if (hevel.focused) {
 			struct window *w;
 			wl_list_for_each(w, &hevel.windows, link) {
@@ -1047,7 +1047,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 				}
 			}
 		}
-#endif
+		#endif
 		hevel.chord.activated = true;
 		swc_pointer_send_button(time, b, state);
 		return;

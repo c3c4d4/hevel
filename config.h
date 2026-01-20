@@ -55,7 +55,13 @@ static const float move_ease_factor = 0.30f;
  * - true  : drag mouse to scroll in any direction
  * - false : use scroll wheel for vertical scrolling only
  */
-static const bool scroll_drag_mode = false;
+static const bool scroll_drag_mode = true;
+
+/*
+ *	whether or not to focus the window
+ * 	on both axis, works only in drag mode
+ */
+static const bool focus_center = false;
 
 /* customizable 2-1 chord 
  * avaliable things:
