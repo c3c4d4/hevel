@@ -95,11 +95,14 @@ static struct {
 		} spawn;
 		int32_t scroll_drag_last_x, scroll_drag_last_y;
 		struct wl_event_source *scroll_drag_timer;
+		float zoom_target;
+		struct wl_event_source *zoom_timer;
 	} chord;
 } hevel;
 
 static int scroll_tick(void *data);
 static void scroll_stop(void);
+static int zoom_tick(void *data);
 
 static void
 remove_resource(struct wl_resource *resource)
@@ -154,13 +157,22 @@ focus_window(struct swc_window *swc, const char *reason)
 
 	swc_window_focus(swc);
 
+	/* zoom back to normalwhen focusing a window */
+	if (enable_zoom && swc && swc_get_zoom() != 1.0f) {
+		hevel.chord.zoom_target = 1.0f;
+		if (!hevel.chord.zoom_timer)
+			hevel.chord.zoom_timer = wl_event_loop_add_timer(hevel.evloop, zoom_tick, NULL);
+		if (hevel.chord.zoom_timer)
+			wl_event_source_timer_update(hevel.chord.zoom_timer, 1);
+	}
+
 	if(swc)
 		swc_window_set_border(swc, inner_border_color_active, inner_border_width, outer_border_color_active, outer_border_width);
 
 	hevel.focused = swc;
 
-	/* center the focused window on both axes */
-	if (focus_center == true && scroll_drag_mode == true && swc && !wl_list_empty(&hevel.screens)) {
+	/* center the focused window: both axes in drag mode, vertical only in scroll wheel mode */
+	if (focus_center == true && swc && !wl_list_empty(&hevel.screens)) {
 		struct swc_rectangle window_geom;
 		struct screen *screen = wl_container_of(hevel.screens.next, screen, link);
 
@@ -173,7 +185,9 @@ focus_window(struct swc_window *swc, const char *reason)
 			int32_t window_center_y = window_geom.y + (int32_t)window_geom.height / 2;
 			int32_t screen_center_x = screen->swc->geometry.x + (int32_t)screen->swc->geometry.width / 2;
 			int32_t screen_center_y = screen->swc->geometry.y + (int32_t)screen->swc->geometry.height / 2;
-			int32_t scroll_delta_x = screen_center_x - window_center_x;
+
+			/* in drag mode: center on both axes; in scroll wheel mode: vertical only */
+			int32_t scroll_delta_x = scroll_drag_mode ? (screen_center_x - window_center_x) : 0;
 			int32_t scroll_delta_y = screen_center_y - window_center_y;
 
 			if (scroll_delta_x != 0 || scroll_delta_y != 0) {
@@ -197,7 +211,7 @@ focus_window(struct swc_window *swc, const char *reason)
 }
 
 static bool
-cursor_position(int32_t *x, int32_t *y)
+cursor_position_raw(int32_t *x, int32_t *y)
 {
 	int32_t fx, fy;
 
@@ -206,6 +220,44 @@ cursor_position(int32_t *x, int32_t *y)
 	*x = wl_fixed_to_int(fx);
 	*y = wl_fixed_to_int(fy);
 	return true;
+}
+
+static bool
+cursor_position(int32_t *x, int32_t *y)
+{
+	if(!cursor_position_raw(x, y))
+		return false;
+
+	if (enable_zoom) {
+		float zoom = swc_get_zoom();
+		if (zoom != 1.0f && !wl_list_empty(&hevel.screens)) {
+			struct screen *scr = wl_container_of(hevel.screens.next, scr, link);
+			int32_t cx = scr->swc->geometry.x + scr->swc->geometry.width / 2;
+			int32_t cy = scr->swc->geometry.y + scr->swc->geometry.height / 2;
+			*x = (int32_t)((*x - cx) / zoom) + cx;
+			*y = (int32_t)((*y - cy) / zoom) + cy;
+		}
+	}
+
+	return true;
+}
+
+static void
+world_to_screen(int32_t wx, int32_t wy, int32_t *sx, int32_t *sy)
+{
+	if (enable_zoom) {
+		float zoom = swc_get_zoom();
+		if (zoom != 1.0f && !wl_list_empty(&hevel.screens)) {
+			struct screen *scr = wl_container_of(hevel.screens.next, scr, link);
+			int32_t cx = scr->swc->geometry.x + scr->swc->geometry.width / 2;
+			int32_t cy = scr->swc->geometry.y + scr->swc->geometry.height / 2;
+			*sx = (int32_t)((wx - cx) * zoom) + cx;
+			*sy = (int32_t)((wy - cy) * zoom) + cy;
+			return;
+		}
+	}
+	*sx = wx;
+	*sy = wy;
 }
 
 static bool
@@ -434,6 +486,33 @@ scroll_stop(void)
 }
 
 static int
+zoom_tick(void *data)
+{
+	(void)data;
+
+	float current = swc_get_zoom();
+	float target = hevel.chord.zoom_target;
+	float diff = target - current;
+
+	/* Stop if close enough */
+	if (diff > -0.01f && diff < 0.01f) {
+		swc_set_zoom(target);
+		return 0;
+	}
+
+	/* Ease toward target */
+	float step = diff / 4.0f;
+	if (step > 0 && step < 0.01f) step = 0.01f;
+	if (step < 0 && step > -0.01f) step = -0.01f;
+
+	swc_set_zoom(current + step);
+
+	/* Continue animation */
+	wl_event_source_timer_update(hevel.chord.zoom_timer, 16);
+	return 0;
+}
+
+static int
 scroll_tick(void *data)
 {
 	struct window *w, *tmp;
@@ -568,8 +647,24 @@ axis(void *data, uint32_t time, uint32_t axis, int32_t value120)
 	if (hevel.chord.moving)
 		return;
 
-	/* in drag scroll mode, forward scroll wheel to clients */
+	/* in drag scroll mode, scroll wheel controls zoom when scrolling active */
 	if (scroll_drag_mode) {
+		if (enable_zoom && hevel.chord.scrolling && axis == 0 && value120 != 0) {
+			/* vertical scroll wheel controls zoom with easing */
+			if (hevel.chord.zoom_target == 0)
+				hevel.chord.zoom_target = swc_get_zoom();
+			float delta = (value120 < 0) ? 0.15f : -0.15f;
+			hevel.chord.zoom_target += delta;
+			if (hevel.chord.zoom_target < 0.25f) hevel.chord.zoom_target = 0.25f;
+			if (hevel.chord.zoom_target > 4.0f) hevel.chord.zoom_target = 4.0f;
+
+			/* Start or continue zoom animation */
+			if (!hevel.chord.zoom_timer)
+				hevel.chord.zoom_timer = wl_event_loop_add_timer(hevel.evloop, zoom_tick, NULL);
+			if (hevel.chord.zoom_timer)
+				wl_event_source_timer_update(hevel.chord.zoom_timer, 1);
+			return;
+		}
 		swc_pointer_send_axis(time, axis, value120);
 		return;
 	}
