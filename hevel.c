@@ -249,11 +249,10 @@ static bool
 is_on_screen(struct swc_rectangle *window, struct screen *screen)
 {
 	struct swc_rectangle *geom = &screen->swc->geometry;
-	int32_t center_x = window->x + (int32_t)window->width / 2;
-	return (center_x >= geom->x && center_x < geom->x + (int32_t)geom->width);
+	
+	return window->x + (int32_t)window->width > geom->x && window->x < geom->x + (int32_t)geom->width;
 }
 	
-
 static void
 world_to_screen(int32_t wx, int32_t wy, int32_t *sx, int32_t *sy)
 {
