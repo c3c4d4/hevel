@@ -57,9 +57,9 @@ static const float move_ease_factor = 0.30f;
  */
 static const bool scroll_drag_mode = false;
 
-/*
- *	whether or not to focus the window
- * 	on both axis, works only in drag mode
+/* whether or not to center the window
+ * in drag mode it centers on both axis
+ * otherwise on the vertical one
  */
 static const bool focus_center = true;
 

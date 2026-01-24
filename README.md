@@ -23,9 +23,10 @@ commands are issued using mouse chords, meaning by pressing a combination of but
 
 - 1 -> 3 -> drag -> release -> creates a new terminal in the dragged box 
 - 3 -> 1 -> move mouse on top of target window -> release -> kill target window
-- 3 -> 2 -> release 2, and with your finger still on the scroll wheel, scroll up/down
+- 3 -> 2 -> release 2, and with your finger still on the scroll wheel, scroll up/down in vertical moder and drag the cursor in drag mode.
 - 2 -> 3 -> release 2 on top of a window, and then drag with 3 to resize said window
 - 2 -> 1 -> release 2 on top of a window, and then drag with 1 to move said window. if you drag to the bottom/top of the screen, it will begin to scroll.
+- 1 -> 2 -> customizable in config
 
 other
 -----
@@ -40,6 +41,12 @@ cd swc
 make install
 ```
 
+to run:
+
+```
+swc-launch hevel
+```
+
 keep in mind this is EXPERIMENTAL SOFTWARE!
 
 linux support is first-class, netbsd works too but you may have to twiddle with makefiles a bit, sorry.
@@ -47,9 +54,3 @@ linux support is first-class, netbsd works too but you may have to twiddle with 
 depending on your needs, you might want to tweak swc/config.mk as well.
 
 hevel-specific configuration can be done with config.h at compile time.
-
-
-
-
-
-

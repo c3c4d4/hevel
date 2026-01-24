@@ -37,6 +37,7 @@ struct window {
 	struct wl_list spawn_link;
 	bool hidden_for_spawn;
 	struct swc_rectangle saved_geometry;
+	
 	bool sticky;
 };
 
@@ -45,8 +46,9 @@ struct screen {
 	struct wl_list link;
 };
 
+static const int timerms = 16;
+
 static const int scrollpx = 64;
-static const int scrollms = 16;
 static const int scrollease = 4;
 static const int scrollcap = 64;
 
@@ -59,6 +61,7 @@ static struct {
 	struct wl_event_loop *evloop;
 	struct wl_list windows;
 	struct wl_list screens;
+	struct screen *current_screen;
 	struct swc_window *focused;
 	struct {
 		bool left, middle, right;
@@ -83,6 +86,7 @@ static struct {
 		int32_t cur_x, cur_y;
 		struct wl_event_source *click_timer;
 		struct wl_event_source *move_scroll_timer;
+		struct wl_event_source *cursor_timer;
 		struct {
 			bool pending;
 			bool forwarded;
@@ -172,9 +176,8 @@ focus_window(struct swc_window *swc, const char *reason)
 	hevel.focused = swc;
 
 	/* center the focused window: both axes in drag mode, vertical only in scroll wheel mode */
-	if (focus_center == true && swc && !wl_list_empty(&hevel.screens)) {
+	if (focus_center == true && swc && hevel.current_screen) {
 		struct swc_rectangle window_geom;
-		struct screen *screen = wl_container_of(hevel.screens.next, screen, link);
 
 		if (swc_window_get_geometry(swc, &window_geom)) {
 			/* skip if window has no size yet (not configured by client) */
@@ -183,8 +186,8 @@ focus_window(struct swc_window *swc, const char *reason)
 
 			int32_t window_center_x = window_geom.x + (int32_t)window_geom.width / 2;
 			int32_t window_center_y = window_geom.y + (int32_t)window_geom.height / 2;
-			int32_t screen_center_x = screen->swc->geometry.x + (int32_t)screen->swc->geometry.width / 2;
-			int32_t screen_center_y = screen->swc->geometry.y + (int32_t)screen->swc->geometry.height / 2;
+			int32_t screen_center_x = hevel.current_screen->swc->geometry.x + (int32_t)hevel.current_screen->swc->geometry.width / 2;
+			int32_t screen_center_y = hevel.current_screen->swc->geometry.y + (int32_t)hevel.current_screen->swc->geometry.height / 2;
 
 			/* in drag mode: center on both axes; in scroll wheel mode: vertical only */
 			int32_t scroll_delta_x = scroll_drag_mode ? (screen_center_x - window_center_x) : 0;
@@ -204,7 +207,7 @@ focus_window(struct swc_window *swc, const char *reason)
 					hevel.chord.scroll_timer = wl_event_loop_add_timer(
 						hevel.evloop, scroll_tick, NULL);
 				}
-				wl_event_source_timer_update(hevel.chord.scroll_timer, scrollms);
+				wl_event_source_timer_update(hevel.chord.scroll_timer, timerms);
 			}
 		}
 	}
@@ -230,10 +233,9 @@ cursor_position(int32_t *x, int32_t *y)
 
 	if (enable_zoom) {
 		float zoom = swc_get_zoom();
-		if (zoom != 1.0f && !wl_list_empty(&hevel.screens)) {
-			struct screen *scr = wl_container_of(hevel.screens.next, scr, link);
-			int32_t cx = scr->swc->geometry.x + scr->swc->geometry.width / 2;
-			int32_t cy = scr->swc->geometry.y + scr->swc->geometry.height / 2;
+		if (zoom != 1.0f && hevel.current_screen) {
+			int32_t cx = hevel.current_screen->swc->geometry.x + hevel.current_screen->swc->geometry.width / 2;
+			int32_t cy = hevel.current_screen->swc->geometry.y + hevel.current_screen->swc->geometry.height / 2;
 			*x = (int32_t)((*x - cx) / zoom) + cx;
 			*y = (int32_t)((*y - cy) / zoom) + cy;
 		}
@@ -242,15 +244,24 @@ cursor_position(int32_t *x, int32_t *y)
 	return true;
 }
 
+/* hacky sorta, only works for vertical cuz of this */
+static bool
+is_on_screen(struct swc_rectangle *window, struct screen *screen)
+{
+	struct swc_rectangle *geom = &screen->swc->geometry;
+	int32_t center_x = window->x + (int32_t)window->width / 2;
+	return (center_x >= geom->x && center_x < geom->x + (int32_t)geom->width);
+}
+	
+
 static void
 world_to_screen(int32_t wx, int32_t wy, int32_t *sx, int32_t *sy)
 {
 	if (enable_zoom) {
 		float zoom = swc_get_zoom();
-		if (zoom != 1.0f && !wl_list_empty(&hevel.screens)) {
-			struct screen *scr = wl_container_of(hevel.screens.next, scr, link);
-			int32_t cx = scr->swc->geometry.x + scr->swc->geometry.width / 2;
-			int32_t cy = scr->swc->geometry.y + scr->swc->geometry.height / 2;
+		if (zoom != 1.0f && hevel.current_screen) {
+			int32_t cx = hevel.current_screen->swc->geometry.x + hevel.current_screen->swc->geometry.width / 2;
+			int32_t cy = hevel.current_screen->swc->geometry.y + hevel.current_screen->swc->geometry.height / 2;
 			*sx = (int32_t)((wx - cx) * zoom) + cx;
 			*sy = (int32_t)((wy - cy) * zoom) + cy;
 			return;
@@ -351,7 +362,7 @@ select_tick(void *data)
 		                    select_box_color, select_box_border);
 	}
 
-	wl_event_source_timer_update(hevel.chord.timer, 16);
+	wl_event_source_timer_update(hevel.chord.timer, timerms);
 	return 0;
 }
 
@@ -359,7 +370,6 @@ static int
 move_scroll_tick(void *data)
 {
 	int32_t x, y;
-	struct screen *s;
 	struct swc_rectangle geometry;
 	int32_t screen_height = 0;
 
@@ -367,19 +377,18 @@ move_scroll_tick(void *data)
 	if(!hevel.chord.moving)
 		return 0;
 
-	/* get screen size,  only first screen */
-	wl_list_for_each(s, &hevel.screens, link){
-		screen_height = s->swc->geometry.height;
-		break;
+	/* get screen size*/
+	if(hevel.current_screen){
+		screen_height = hevel.current_screen->swc->geometry.height;
 	}
 
 	if(screen_height == 0){
-		wl_event_source_timer_update(hevel.chord.move_scroll_timer, 16);
+		wl_event_source_timer_update(hevel.chord.move_scroll_timer, timerms);
 		return 0;
 	}
 
 	if(!cursor_position(&x, &y)){
-		wl_event_source_timer_update(hevel.chord.move_scroll_timer, 16);
+		wl_event_source_timer_update(hevel.chord.move_scroll_timer, timerms);
 		return 0;
 	}
 
@@ -409,7 +418,7 @@ move_scroll_tick(void *data)
 			wl_event_source_timer_update(hevel.chord.scroll_timer, 1);
 	}
 
-	wl_event_source_timer_update(hevel.chord.move_scroll_timer, 16);
+	wl_event_source_timer_update(hevel.chord.move_scroll_timer, timerms);
 	return 0;
 }
 
@@ -486,6 +495,37 @@ scroll_stop(void)
 }
 
 static int
+cursor_tick(void *data)
+{
+	(void)data;
+
+	int32_t x, y;
+	struct screen *ns = NULL;
+
+	if (!cursor_position_raw(&x, &y)) {
+		wl_event_source_timer_update(hevel.chord.cursor_timer, timerms);
+		return 0;
+	}
+
+	wl_list_for_each(ns, &hevel.screens, link) {
+		struct swc_rectangle *geom = &ns->swc->geometry;
+
+		if(x >= geom->x && x < geom->x + (int32_t)geom->width &&
+				y >= geom->y && y < geom->y + (int32_t)geom->height) {
+			
+			if(hevel.current_screen != ns)
+				hevel.current_screen = ns;
+
+			break;
+		}
+
+	}
+
+	wl_event_source_timer_update(hevel.chord.cursor_timer, timerms);
+	return 0;
+}
+
+static int
 zoom_tick(void *data)
 {
 	(void)data;
@@ -508,7 +548,7 @@ zoom_tick(void *data)
 	swc_set_zoom(current + step);
 
 	/* Continue animation */
-	wl_event_source_timer_update(hevel.chord.zoom_timer, 16);
+	wl_event_source_timer_update(hevel.chord.zoom_timer, timerms);
 	return 0;
 }
 
@@ -578,6 +618,9 @@ scroll_tick(void *data)
 			continue;
 		if (!swc_window_get_geometry(w->swc, &geometry))
 			continue;
+		if (!scroll_drag_mode && !is_on_screen(&geometry, hevel.current_screen))
+			continue;
+
 		if (debugscroll) {
 			hevel.chord.scroll_last = w->swc;
 			hevel.chord.scroll_last_geo = geometry;
@@ -588,7 +631,7 @@ scroll_tick(void *data)
 
 	hevel.chord.scroll_pending_px -= step;
 	hevel.chord.scroll_pending_px_x -= step_x;
-	wl_event_source_timer_update(hevel.chord.scroll_timer, scrollms);
+	wl_event_source_timer_update(hevel.chord.scroll_timer, timerms);
 	return 0;
 }
 
@@ -605,7 +648,7 @@ scroll_drag_tick(void *data)
 	}
 
 	if (!cursor_position(&x, &y)) {
-		wl_event_source_timer_update(hevel.chord.scroll_drag_timer, scrollms);
+		wl_event_source_timer_update(hevel.chord.scroll_drag_timer, timerms);
 		return 0;
 	}
 
@@ -615,7 +658,7 @@ scroll_drag_tick(void *data)
 	hevel.chord.scroll_drag_last_y = y;
 
 	if (delta_x == 0 && delta_y == 0) {
-		wl_event_source_timer_update(hevel.chord.scroll_drag_timer, scrollms);
+		wl_event_source_timer_update(hevel.chord.scroll_drag_timer, timerms);
 		return 0;
 	}
 
@@ -634,7 +677,7 @@ scroll_drag_tick(void *data)
 	if (hevel.chord.scroll_timer)
 		wl_event_source_timer_update(hevel.chord.scroll_timer, 1);
 
-	wl_event_source_timer_update(hevel.chord.scroll_drag_timer, scrollms);
+	wl_event_source_timer_update(hevel.chord.scroll_drag_timer, timerms);
 	return 0;
 }
 
@@ -782,6 +825,11 @@ newscreen(struct swc_screen *swc)
 	wl_list_insert(&hevel.screens, &s->link);
 	swc_screen_set_handler(swc, &screenhandler, s);
 	printf("screen %dx%d\n", swc->geometry.width, swc->geometry.height);
+
+	if (!hevel.chord.cursor_timer)
+		hevel.chord.cursor_timer = wl_event_loop_add_timer(hevel.evloop, cursor_tick, NULL);
+	if (hevel.chord.cursor_timer)
+		wl_event_source_timer_update(hevel.chord.cursor_timer, timerms);
 }
 
 /* helpers for pid*/
@@ -1036,7 +1084,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 			if (!hevel.chord.scroll_drag_timer)
 				hevel.chord.scroll_drag_timer = wl_event_loop_add_timer(hevel.evloop, scroll_drag_tick, NULL);
 			if (hevel.chord.scroll_drag_timer)
-				wl_event_source_timer_update(hevel.chord.scroll_drag_timer, scrollms);
+				wl_event_source_timer_update(hevel.chord.scroll_drag_timer, timerms);
 		}
 
 		if (debugscroll)
@@ -1067,7 +1115,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		if(!hevel.chord.move_scroll_timer)
 			hevel.chord.move_scroll_timer = wl_event_loop_add_timer(hevel.evloop, move_scroll_tick, NULL);
 		if(hevel.chord.move_scroll_timer)
-			wl_event_source_timer_update(hevel.chord.move_scroll_timer, 16);
+			wl_event_source_timer_update(hevel.chord.move_scroll_timer, timerms);
 
 		/* forward the release so clients dont see stuck */
 		swc_pointer_send_button(time, b, state);
@@ -1128,21 +1176,25 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 		return;
 	}
 
-	if (b == BTN_LEFT && pressed && was_middle && !hevel.chord.activated) {
+	if (b == BTN_MIDDLE && pressed && was_left && !hevel.chord.activated) {
 		click_cancel();
 		stop_select();
 		
-		#ifdef STICKY
 		if (hevel.focused) {
 			struct window *w;
 			wl_list_for_each(w, &hevel.windows, link) {
 				if (w->swc == hevel.focused) {
-					w->sticky = !w->sticky;
+					#if defined(STICKY)
+						w->sticky = !w->sticky;
+					#elif defined(FULLSCREEN)
+						/* doesn't do shit yet, need to go into swc to finish the func */
+						swc_window_set_fullscreen(hevel.focused, hevel.current_screen->swc);
+					#endif
 					break;
 				}
 			}
 		}
-		#endif
+
 		hevel.chord.activated = true;
 		swc_pointer_send_button(time, b, state);
 		return;
@@ -1184,7 +1236,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 			if(!hevel.chord.timer)
 				hevel.chord.timer = wl_event_loop_add_timer(hevel.evloop, select_tick, NULL);
 			if(hevel.chord.timer)
-				wl_event_source_timer_update(hevel.chord.timer, 16);
+				wl_event_source_timer_update(hevel.chord.timer, timerms);
 		}
 	}
 
@@ -1310,7 +1362,8 @@ main(void)
 	wl_list_init(&hevel.windows);
 	wl_list_init(&hevel.screens);
 	wl_list_init(&scrollpos_resources);
-
+	
+	hevel.current_screen = NULL;
 	hevel.display = wl_display_create();
 	if(!hevel.display){
 		fprintf(stderr, "cannot create display\n");
