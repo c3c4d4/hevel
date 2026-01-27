@@ -73,9 +73,13 @@ library installed. Hevel requires the following dependencies:
 - pkg-config
 - wayland-scanner, wayland-server, wayland-client
 - wayland-server, wayland-client
-- libinput, libdrm, pixman, xkbcommon, libudev
+- libinput, libdrm, pixman, xkbcommon
 - wld
-- xcb, xcb-composite, xcb-ewmh, xcb-icccm 
+- libudev, xcb, xcb-composite, xcb-ewmh, xcb-icccm 
+
+**NOTE**: The last dependencies are optional. They are required 
+for the `ENABLE_LIBUDEV` and `ENABLE_XWAYLAND` options respectively 
+in swc/config.mk. 
 
 Hevel's fork of swc is bundled in swc/ and will be built automatically.
 
