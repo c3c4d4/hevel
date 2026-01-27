@@ -35,6 +35,8 @@ Mouse buttons are referred to as follows:
 - 2: middle click (scroll wheel)
 - 3: right click.
 
+Here are the commands:
+
 - 1 → 3 → drag → release
 
   Create a new terminal in the dragged rectangle.
@@ -60,18 +62,26 @@ Mouse buttons are referred to as follows:
 
   User-configurable (see config.h).
 
-Other 
+Building
 ----- 
 
-To build hevel, you will need the michaelforney/wld library installed.
+To build hevel, you will need the [wld](https://github.com/michaelforney/wld) 
+library installed. Hevel requires the following dependencies:
 
-Build steps:
+- A C11-compatible compiler
+- make
+- pkg-config
+- wayland-scanner, wayland-server, wayland-client
+- wayland-server, wayland-client
+- libinput, libdrm, pixman, xkbcommon, libudev
+- wld
+- xcb, xcb-composite, xcb-ewmh, xcb-icccm 
+
+Hevel's fork of swc is bundled in swc/ and will be built automatically.
 
 ```
 make
 make install 
-cd swc 
-make install
 ```
 
 To run:
@@ -79,12 +89,8 @@ To run:
 ```
 swc-launch hevel
 ```
-
-**NOTE**: If you don't have `swc-launch`, then you forgot to do the last two 
-steps. Additionally, since hevel depends on a forked variant of swc, the one
-that may be available in your package manager is not compatible.
-
 Linux is the primary supported platform. NetBSD and FreeBSD also work, but may
+
 require minor Makefile adjustments. Depending on your setup, you may want to 
 tweak swc/config.mk.
 
