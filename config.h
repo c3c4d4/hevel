@@ -5,7 +5,7 @@
 	static char* imgpath = "/home/dalem/walls/floral.png";
 #endif 
 
-static const uint32_t background_color = 0xff787878;
+static const uint32_t background_color = 0xff777777;
 
 static const uint32_t outer_border_color_inactive = 0xffffffea;
 static const uint32_t inner_border_color_inactive = 0xffddbd8c;
@@ -55,7 +55,7 @@ static const float move_ease_factor = 0.30f;
  * - true  : drag mouse to scroll in any direction
  * - false : use scroll wheel for vertical scrolling only
  */
-static const bool scroll_drag_mode = false;
+static const bool scroll_drag_mode = true;
 
 /* whether or not to center the window
  * in drag mode it centers on both axis
@@ -66,11 +66,13 @@ static const bool focus_center = true;
 /*
  * enable zoom feature:
  * - when enabled: scroll wheel controls zoom when in drag scroll mode
+ * broken for multiple monitors
  */
 static const bool enable_zoom = false;
 
 /* customizable 2-1 chord
  * avaliable things:
- * - STICKY: make window now move when scroll
+ * - STICKY: make window not move when scroll
+ * - FULLSCREEN: make a window take entire screen
  */
-#define STICKY
+#define FULLSCREEN

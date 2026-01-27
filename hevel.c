@@ -1186,7 +1186,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 					#if defined(STICKY)
 						w->sticky = !w->sticky;
 					#elif defined(FULLSCREEN)
-						/* doesn't do shit yet, need to go into swc to finish the func */
+						w->sticky = !w->sticky;
 						swc_window_set_fullscreen(hevel.focused, hevel.current_screen->swc);
 					#endif
 					break;
