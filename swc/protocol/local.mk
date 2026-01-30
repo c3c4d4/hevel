@@ -14,25 +14,24 @@ PROTOCOL_EXTENSIONS =           \
 
 $(dir)_PACKAGES := wayland-server
 
-define protocol_rules
+.for ext in ${PROTOCOL_EXTENSIONS}
+proto_base := ${ext:T:R}
 
-$(dir)/$$(basename $$(notdir $(1)))-protocol.c: $(1) \
-    $(dir)/$$(basename $$(notdir $(1)))-server-protocol.h \
-    $(dir)/$$(basename $$(notdir $(1)))-client-protocol.h
-	$$(Q_GEN)$$(WAYLAND_SCANNER) code $(1) $${.TARGET}
+${dir}/${proto_base}-protocol.c: ${ext} \
+    ${dir}/${proto_base}-server-protocol.h \
+    ${dir}/${proto_base}-client-protocol.h
+	${Q_GEN}${WAYLAND_SCANNER} code ${ext} ${.TARGET}
 
-$(dir)/$$(basename $$(notdir $(1)))-server-protocol.h: $(1)
-	$$(Q_GEN)$$(WAYLAND_SCANNER) server-header $(1) $${.TARGET}
+${dir}/${proto_base}-server-protocol.h: ${ext}
+	${Q_GEN}${WAYLAND_SCANNER} server-header ${ext} ${.TARGET}
 
-$(dir)/$$(basename $$(notdir $(1)))-client-protocol.h: $(1)
-	$$(Q_GEN)$$(WAYLAND_SCANNER) client-header $(1) $${.TARGET}
+${dir}/${proto_base}-client-protocol.h: ${ext}
+	${Q_GEN}${WAYLAND_SCANNER} client-header ${ext} ${.TARGET}
 
-CLEAN_FILES += $(foreach type,protocol.c server-protocol.h client-protocol.h, \
-    $(dir)/$$(basename $$(notdir $(1)))-$(type))
-
-endef
-
-$(eval $(foreach extension,$(PROTOCOL_EXTENSIONS),$(call protocol_rules,$(extension))))
+CLEAN_FILES += ${dir}/${proto_base}-protocol.c \
+    ${dir}/${proto_base}-server-protocol.h \
+    ${dir}/${proto_base}-client-protocol.h
+.endfor
 
 install-$(dir): | $(DESTDIR)$(DATADIR)/swc
 	install -m 644 protocol/swc.xml $(DESTDIR)$(DATADIR)/swc
