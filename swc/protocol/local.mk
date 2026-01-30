@@ -19,13 +19,13 @@ define protocol_rules
 $(dir)/$$(basename $$(notdir $(1)))-protocol.c: $(1) \
     $(dir)/$$(basename $$(notdir $(1)))-server-protocol.h \
     $(dir)/$$(basename $$(notdir $(1)))-client-protocol.h
-	$$(Q_GEN)$$(WAYLAND_SCANNER) code <$(1) >$$@
+	$$(Q_GEN)$$(WAYLAND_SCANNER) code $(1) $${.TARGET}
 
 $(dir)/$$(basename $$(notdir $(1)))-server-protocol.h: $(1)
-	$$(Q_GEN)$$(WAYLAND_SCANNER) server-header <$(1) >$$@
+	$$(Q_GEN)$$(WAYLAND_SCANNER) server-header $(1) $${.TARGET}
 
 $(dir)/$$(basename $$(notdir $(1)))-client-protocol.h: $(1)
-	$$(Q_GEN)$$(WAYLAND_SCANNER) client-header <$(1) >$$@
+	$$(Q_GEN)$$(WAYLAND_SCANNER) client-header $(1) $${.TARGET}
 
 CLEAN_FILES += $(foreach type,protocol.c server-protocol.h client-protocol.h, \
     $(dir)/$$(basename $$(notdir $(1)))-$(type))
