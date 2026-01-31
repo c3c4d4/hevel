@@ -26,14 +26,14 @@ static const uint32_t select_box_border = 2;
 static const char *const cursor_theme = "nein";
 
 static const char *const select_term_app_id = "st-wl-256color";
-static const char *const term = "st-wl";
+static const char *const term = "havoc";
 
 /* a flag for your terminal emulator to setup a windowid 
  * - for havoc: -i
  * - for st-wl: -w
  * - for everything else: idk
  */
-static const char *const term_flag = "-w";
+static const char *const term_flag = "-i";
 
 /* gui programs take over the geometry of the terminal, broken for xwayland */
 static const bool enable_terminal_spawning = true;
@@ -55,13 +55,13 @@ static const float move_ease_factor = 0.30f;
  * - true  : drag mouse to scroll in any direction
  * - false : use scroll wheel for vertical scrolling only
  */
-static const bool scroll_drag_mode = true;
+static const bool scroll_drag_mode = false;
 
 /* whether or not to center the window
  * in drag mode it centers on both axis
  * otherwise on the vertical one
  */
-static const bool focus_center = true;
+static bool focus_center = true;
 
 /*
  * enable zoom feature:
@@ -74,5 +74,6 @@ static const bool enable_zoom = false;
  * avaliable things:
  * - STICKY: make window not move when scroll
  * - FULLSCREEN: make a window take entire screen
+ * - JUMP: switch focus to the closest window
  */
-#define FULLSCREEN
+#define JUMP

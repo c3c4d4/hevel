@@ -71,6 +71,7 @@ static struct {
 		bool auto_scrolling;
 		bool moving;
 		bool resize;
+		bool jumping;
 		int32_t move_start_win_x, move_start_win_y;
 		int32_t move_start_cursor_x, move_start_cursor_y;
 		int32_t scroll_rem, scroll_rem_x;
@@ -107,6 +108,7 @@ static struct {
 static int scroll_tick(void *data);
 static void scroll_stop(void);
 static int zoom_tick(void *data);
+static bool is_visible(struct swc_window *w, struct screen *screen);
 
 static void
 remove_resource(struct wl_resource *resource)
@@ -175,8 +177,8 @@ focus_window(struct swc_window *swc, const char *reason)
 
 	hevel.focused = swc;
 
-	/* center the focused window: both axes in drag mode, vertical only in scroll wheel mode */
-	if (focus_center == true && swc && hevel.current_screen) {
+	/* center the focused window: both axes in drag mode, vertical only in scroll wheel mode, only when visible or jumping to it, else you can center offscreen windows */
+	if (focus_center == true && swc && hevel.current_screen && (is_visible(hevel.focused, hevel.current_screen) || hevel.chord.jumping == true)) {
 		struct swc_rectangle window_geom;
 
 		if (swc_window_get_geometry(swc, &window_geom)) {
@@ -251,6 +253,19 @@ is_on_screen(struct swc_rectangle *window, struct screen *screen)
 	struct swc_rectangle *geom = &screen->swc->geometry;
 	
 	return window->x + (int32_t)window->width > geom->x && window->x < geom->x + (int32_t)geom->width;
+}
+
+static bool
+is_visible(struct swc_window *w, struct screen *screen)
+{
+	struct swc_rectangle *geom = &screen->swc->geometry;
+	struct swc_rectangle wgeom;
+	swc_window_get_geometry(w, &wgeom);
+
+	bool h = wgeom.x + (int32_t)wgeom.width > geom->x && wgeom.x < geom->x + (int32_t)geom->width;
+	bool v = wgeom.y + (int32_t)wgeom.height > geom->y && wgeom.y < geom->y + (int32_t)geom->height;
+
+	return h && v;
 }
 	
 static void
@@ -993,7 +1008,7 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 	struct swc_rectangle geometry;
 	bool was_left = hevel.chord.left;
 	bool was_right = hevel.chord.right;
-	bool was_middle = hevel.chord.middle;
+	//bool was_middle = hevel.chord.middle;
 	bool is_lr;
 	bool is_chord_button;
 	bool acme_passthrough = false;
@@ -1188,6 +1203,45 @@ button(void *data, uint32_t time, uint32_t b, uint32_t state)
 					#elif defined(FULLSCREEN)
 						w->sticky = !w->sticky;
 						swc_window_set_fullscreen(hevel.focused, hevel.current_screen->swc);
+					#elif defined(JUMP)
+						bool state = focus_center;
+						focus_center = true;
+						hevel.chord.jumping = true;
+						struct window *closest = NULL;
+						struct window *n;
+						struct swc_rectangle ngeom;
+
+						int32_t x = 0, y = 0;
+						cursor_position_raw(&x, &y);
+						int64_t mindist = INT64_MAX;
+						wl_list_for_each(n, &hevel.windows, link) {
+							if (!n->swc)
+								continue;
+
+							if (!swc_window_get_geometry(n->swc, &ngeom))
+								continue;
+							
+							/* makes a cool switcher thingy */
+							if (n->swc == hevel.focused)
+								continue;
+
+							int64_t dx = (int64_t)x - (int64_t)ngeom.x;
+							int64_t dy = (int64_t)y - (int64_t)ngeom.y;
+
+							/* fuck sqrt() */
+							int64_t dist = dx*dx + dy*dy;
+
+							if (dist < mindist) {
+								closest = n;
+								mindist = dist;
+							}
+						}
+
+						if (closest != NULL)
+							focus_window(closest->swc, "jump");
+						
+						hevel.chord.jumping = false;
+						focus_center = state;
 					#endif
 					break;
 				}
