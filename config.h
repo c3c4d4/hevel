@@ -26,14 +26,14 @@ static const uint32_t select_box_border = 2;
 static const char *const cursor_theme = "nein";
 
 static const char *const select_term_app_id = "st-wl-256color";
-static const char *const term = "havoc";
+static const char *const term = "st-wl";
 
 /* a flag for your terminal emulator to setup a windowid 
  * - for havoc: -i
  * - for st-wl: -w
  * - for everything else: idk
  */
-static const char *const term_flag = "-i";
+static const char *const term_flag = "-w";
 
 /* gui programs take over the geometry of the terminal, broken for xwayland */
 static const bool enable_terminal_spawning = true;
