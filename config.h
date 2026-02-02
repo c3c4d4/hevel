@@ -55,7 +55,7 @@ static const float move_ease_factor = 0.30f;
  * - true  : drag mouse to scroll in any direction
  * - false : use scroll wheel for vertical scrolling only
  */
-static const bool scroll_drag_mode = false;
+static const bool scroll_drag_mode = true;
 
 /* whether or not to center the window
  * in drag mode it centers on both axis
@@ -68,7 +68,7 @@ static bool focus_center = true;
  * - when enabled: scroll wheel controls zoom when in drag scroll mode
  * broken for multiple monitors
  */
-static const bool enable_zoom = false;
+static const bool enable_zoom = true;
 
 /* customizable 2-1 chord
  * avaliable things:

@@ -68,7 +68,6 @@ clean:
 	rm -f $(PROTO_HEVEL_SERVER_H) $(PROTO_HEVEL_CLIENT_H) $(PROTO_HEVEL_SERVER_C) $(PROTO_HEVEL_CLIENT_C) $(PROTO_HEVEL_SERVER_O) $(PROTO_HEVEL_CLIENT_O)
 	rm -f swcsnap swcsnap.o
 	rm -f hbar extra/hbar/hbar.o
-	$(MAKE) -C $(SWC_DIR) clean
 
 install: hevel
 	install -D -m 755 hevel $(DESTDIR)$(BINDIR)/hevel
