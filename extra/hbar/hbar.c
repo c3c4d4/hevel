@@ -37,7 +37,7 @@
 #include <wld/wayland.h>
 #include <wld/wld.h>
 
-#include "swc-client-protocol.h"
+#include <swc-client-protocol.h>
 #include "hevel-client-protocol.h"
 
 enum align {
