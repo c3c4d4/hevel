@@ -8,11 +8,3 @@ hevel.o
 *.mp4
 *.o
 *.a
-swc/cursor/convert_font
-swc/launch/swc-launch
-swc/swc.pc
-swc/protocol/*-protocol.c
-swc/protocol/*-protocol.h
-swc/cursor/cursor_data.h
-*.mp4
-*.ppm

@@ -12,12 +12,10 @@ is a modernization of mouse-driven Unix and Plan 9 window systems such as mux,
 8½, and rio.
 
 Unlike those systems, hevel has no menus and is not limited to a single
-screen of space. Instead, the desktop is an infinite vertical plane:
-windows can be created anywhere, and the view can be freely scrolled up
-and down.
+screen of space. Instead, the desktop is an infinite plane:
+windows can be created anywhere, and the view can be freely scrolled thru (vertically, or in all axis).
 
-hevel is implemented using the swc library, with several custom
-extensions.
+hevel is implemented using the [neuswc](https://git.sr.ht/~shrub900/neuswc) library.
 
 hevel is the flagship window manager designed for use with 
 [dérive linux](https://derivelinux.org).
@@ -79,9 +77,7 @@ library installed. Hevel requires the following dependencies:
 
 **NOTE**: The last dependencies are optional. They are required 
 for the `ENABLE_LIBUDEV` and `ENABLE_XWAYLAND` options respectively 
-in swc/config.mk. 
-
-Hevel's fork of swc is bundled in swc/ and will be built automatically.
+in neuswc 
 
 ```
 make
@@ -96,6 +92,6 @@ swc-launch hevel
 Linux is the primary supported platform. NetBSD and FreeBSD also work, but may
 
 require minor Makefile adjustments. Depending on your setup, you may want to 
-tweak swc/config.mk.
+tweak neuswc itself
 
 hevel-specific configuration is done at compile time via config.h.
