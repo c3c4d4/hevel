@@ -11,7 +11,7 @@ PROTO_HEVEL_CLIENT_C = $(PROTO_DIR)/hevel-client-protocol.c
 PROTO_HEVEL_SERVER_O = $(PROTO_DIR)/hevel-server.o
 PROTO_HEVEL_CLIENT_O = $(PROTO_DIR)/hevel-client-protocol.o
 
-CFLAGS = -O2 -std=c11 -Wall -Wextra
+CFLAGS = -O2 -std=c99 -Wall -Wextra
 CFLAGS += -I$(PREFIX)/include
 CFLAGS += -I$(PROTO_DIR)
 CFLAGS += `pkg-config --cflags swc wayland-server libinput pixman-1 xkbcommon libdrm wld`
@@ -19,14 +19,14 @@ CFLAGS += `pkg-config --cflags swc wayland-server libinput pixman-1 xkbcommon li
 LDFLAGS = -L$(PREFIX)/lib -Wl,-rpath,$(PREFIX)/lib
 LDLIBS += `pkg-config --libs swc wayland-server libinput pixman-1 xkbcommon libdrm libudev xcb xcb-composite xcb-ewmh xcb-icccm wld`
 
-SNAP_CLIENT_CFLAGS = -O2 -std=c11 -Wall -Wextra
+SNAP_CLIENT_CFLAGS = -O2 -std=c99 -Wall -Wextra
 SNAP_CLIENT_CFLAGS += `pkg-config --cflags swc wayland-client libinput pixman-1 xkbcommon libdrm wld` 
 SNAP_CLIENT_LDLIBS = `pkg-config --libs swc wayland-client libinput pixman-1 xkbcommon libdrm libudev xcb xcb-composite xcb-ewmh xcb-icccm wld`
 SNAP_C = extra/swcsnap/swcsnap.c
 
 HBAR_C = extra/hbar/hbar.c
 HBAR_O = extra/hbar/hbar.o
-HBAR_CFLAGS = -O2 -std=c11 -Wall -Wextra -Wno-unused-parameter
+HBAR_CFLAGS = -O2 -std=c99 -Wall -Wextra -Wno-unused-parameter
 HBAR_CFLAGS += `pkg-config --cflags swc wayland-client libinput pixman-1 xkbcommon libdrm wld` 
 HBAR_CFLAGS += -I$(PROTO_DIR)
 HBAR_LDLIBS = `pkg-config --libs swc wayland-client libinput pixman-1 xkbcommon libdrm libudev xcb xcb-composite xcb-ewmh xcb-icccm wld`
