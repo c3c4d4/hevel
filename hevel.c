@@ -1436,7 +1436,7 @@ main(void)
 	maybe_enable_nein_cursor_theme();
 	
 	#ifdef USE_IMAGE
-		swc_wallpaper_init(imgpath);
+		swc_wallpaper_set(imgpath);
 	#endif
 
 	#ifndef USE_IMAGE
