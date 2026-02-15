@@ -67,22 +67,17 @@ To build hevel, you will need the [neuwld](https://git.sr.ht/~shrub900/neuwld) a
 library installed. Hevel requires the following dependencies:
 
 - A C99-compatible compiler
-- make
+- BSD make
 - pkg-config
 - wayland-scanner, wayland-server, wayland-client
 - wayland-server, wayland-client
 - libinput, libdrm, pixman, xkbcommon
 - neuwld
 - neuswc
-- libudev, xcb, xcb-composite, xcb-ewmh, xcb-icccm 
-
-**NOTE**: The last dependencies are optional. They are required 
-for the `ENABLE_LIBUDEV` and `ENABLE_XWAYLAND` options respectively 
-in neuswc 
 
 ```
-make
-make install 
+bmake
+bmake install 
 ```
 
 To run:
@@ -92,6 +87,6 @@ swc-launch hevel
 ```
 Linux is the primary supported platform. NetBSD and FreeBSD also work, but may
 require minor Makefile adjustments. Depending on your setup, you may want to 
-tweak neuswc itself via config.mk
+tweak neuswc itself via config.mk before compiling hevel.
 
 hevel-specific configuration is done at compile time via config.h.
