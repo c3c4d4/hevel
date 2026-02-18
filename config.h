@@ -1,10 +1,3 @@
-/* uncomment to use an image, this isn't an actual boolean */
-//#define USE_IMAGE true
-
-#ifdef USE_IMAGE
-	static char* imgpath = "/home/dalem/walls/floral.png";
-#endif 
-
 static const uint32_t background_color = 0xff777777;
 
 static const uint32_t outer_border_color_inactive = 0xffffffea;

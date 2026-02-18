@@ -1435,14 +1435,6 @@ main(void)
 
 	maybe_enable_nein_cursor_theme();
 	
-	#ifdef USE_IMAGE
-		swc_wallpaper_set(imgpath);
-	#endif
-
-	#ifndef USE_IMAGE
-		swc_wallpaper_color_set(background_color);
-	#endif
-
 	swc_add_binding(SWC_BINDING_KEY, SWC_MOD_LOGO | SWC_MOD_SHIFT,
 	                XKB_KEY_q, quit, NULL);
 	swc_add_binding(SWC_BINDING_BUTTON, SWC_MOD_ANY, BTN_LEFT, button, NULL);
