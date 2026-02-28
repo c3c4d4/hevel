@@ -64,7 +64,7 @@ Building
 ----- 
 
 To build hevel, you will need the [neuwld](https://git.sr.ht/~shrub900/neuwld) and [neuswc](https://git.sr.ht/~shrub900/neuswc)
-library installed. Hevel requires the following dependencies:
+library installed. Hevel requires the following development dependencies:
 
 - A C99-compatible compiler
 - BSD make
@@ -72,8 +72,8 @@ library installed. Hevel requires the following dependencies:
 - wayland-scanner, wayland-server, wayland-client
 - wayland-server, wayland-client
 - libinput, libdrm, pixman, xkbcommon
-- neuwld
-- neuswc
+- [neuwld](https://git.sr.ht/~shrub900/neuwld)
+- [neuswc](https://git.sr.ht/~shrub900/neuswc)
 
 ```
 bmake
