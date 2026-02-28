@@ -1,6 +1,6 @@
 # hbar
 
-hbar is a bar for hevel, it is based on the panel in velox.
+hbar is a bar for mura, it is based on the panel in velox.
 
 ## TODO
 

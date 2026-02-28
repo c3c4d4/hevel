@@ -38,7 +38,7 @@
 #include <wld/wld.h>
 
 #include <swc-client-protocol.h>
-#include "hevel-client-protocol.h"
+#include "mura-client-protocol.h"
 
 enum align {
 	ALIGN_LEFT,
@@ -91,15 +91,15 @@ static void registry_global(void *data, struct wl_registry *registry,
 static void registry_global_remove(void *data, struct wl_registry *registry, uint32_t name);
 
 static void panel_docked(void *data, struct swc_panel *panel, uint32_t length);
-static void hevel_bar_scroll(void *data, struct hevel_scroll *hscroll, int32_t pos);
+static void mura_bar_scroll(void *data, struct mura_scroll *hscroll, int32_t pos);
 
 /* Item interfaces */
 struct scroll {
-	struct hevel_scroll *scroll;
+	struct mura_scroll *scroll;
 	int32_t pos;
 };
 
-static struct scroll hevel;
+static struct scroll mura;
 
 static void text_draw(struct status_bar *status_bar, struct item *item, uint32_t x, uint32_t y);
 
@@ -130,8 +130,8 @@ static const struct item_interface text_interface = {
 	.draw = &text_draw
 };
 
-static const struct hevel_scroll_listener hevel_scroll_listener = {
-	.get_pos = hevel_bar_scroll,
+static const struct mura_scroll_listener mura_scroll_listener = {
+	.get_pos = mura_bar_scroll,
 };
 
 /* Configuration parameters */
@@ -210,10 +210,10 @@ registry_global(void *data, struct wl_registry *registry,
 		if (!screen->swc)
 			die("Failed to bind swc_screen");
 		wl_list_insert(screens.prev, &screen->link);
-	} else if(strcmp(interface, "hevel_scroll") == 0) {
-		hevel.scroll = wl_registry_bind(registry, name, &hevel_scroll_interface, 1);
-		hevel.pos = 0;
-		hevel_scroll_add_listener(hevel.scroll, &hevel_scroll_listener, NULL);
+	} else if(strcmp(interface, "mura_scroll") == 0) {
+		mura.scroll = wl_registry_bind(registry, name, &mura_scroll_interface, 1);
+		mura.pos = 0;
+		mura_scroll_add_listener(mura.scroll, &mura_scroll_listener, NULL);
 	}
 }
 
@@ -284,12 +284,12 @@ draw(struct status_bar *bar)
 }
 
 static void
-hevel_bar_scroll(void *data, struct hevel_scroll *hscroll, int32_t pos)
+mura_bar_scroll(void *data, struct mura_scroll *hscroll, int32_t pos)
 {
 	(void)data;
 	(void)hscroll;
 
-	hevel.pos = pos;
+	mura.pos = pos;
 	snprintf(scroll_text, sizeof(scroll_text), "pos: %d", pos);
 	update_text_item_data(&scroll_data);
 }
@@ -320,8 +320,8 @@ setup(void)
 	/* Wait for globals. */
 	wl_display_roundtrip(display);
 
-	if (!compositor || !panel_manager || !hevel.scroll) {
-		die("Missing required globals: wl_compositor, swc_panel_manager, hevel_scroll");
+	if (!compositor || !panel_manager || !mura.scroll) {
+		die("Missing required globals: wl_compositor, swc_panel_manager, mura_scroll");
 	}
 
 	wld.context = wld_wayland_create_context(display, WLD_ANY);
@@ -365,7 +365,7 @@ setup(void)
 		/* Clock */
 		item = item_new(&text_interface, &clock_data.base);
 		wl_list_insert(items, &item->link);
-		
+
 		items = &screen->status_bar.items[ALIGN_LEFT];
 		item = item_new(&text_interface, &scroll_data.base);
 		wl_list_insert(items, &item->link);

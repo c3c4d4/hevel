@@ -1,24 +1,20 @@
-hevel 
+mura 
 -----
 
-"Make the user interface invisible"
+*this is a fork of [hevel](https://git.sr.ht/~shrub900/hevel)*
 
-hevel is a scrollable, floating window manager for Wayland that uses mouse
-chords for all commands.
+mura is a scrollable, floating window manager on an infinite euclidean plane for Wayland that uses mouse commands for all commands.
 
 Its design is inspired by ideas from Rob Pike's 1988 paper, "Window Systems 
-Should be Transparent", taken to their logical extremes. In this sense, hevel
+Should be Transparent", taken to their logical extremes. In this sense, mura
 is a modernization of mouse-driven Unix and Plan 9 window systems such as mux,
 8½, and rio.
 
-Unlike those systems, hevel has no menus and is not limited to a single
+Unlike those systems, mura has no menus and is not limited to a single
 screen of space. Instead, the desktop is an infinite plane:
 windows can be created anywhere, and the view can be freely scrolled thru (vertically, or in all axis).
 
-hevel is implemented using the [neuswc](https://git.sr.ht/~shrub900/neuswc) library.
-
-hevel is the flagship window manager designed for use with 
-[dérive linux](https://derivelinux.org).
+mura is implemented using the [neuswc](https://git.sr.ht/~shrub900/neuswc) library.
 
 **WARNING**: This is experimental software. Use at your own risk.
 
@@ -63,8 +59,8 @@ Here are the commands:
 Building
 ----- 
 
-To build hevel, you will need the [neuwld](https://git.sr.ht/~shrub900/neuwld) and [neuswc](https://git.sr.ht/~shrub900/neuswc)
-library installed. Hevel requires the following development dependencies:
+To build mura, you will need the [neuwld](https://git.sr.ht/~shrub900/neuwld) and [neuswc](https://git.sr.ht/~shrub900/neuswc)
+library installed. mura requires the following development dependencies:
 
 - A C99-compatible compiler
 - BSD make
@@ -83,10 +79,10 @@ bmake install
 To run:
 
 ```
-swc-launch hevel
+swc-launch mura
 ```
 Linux is the primary supported platform. NetBSD and FreeBSD also work, but may
 require minor Makefile adjustments. Depending on your setup, you may want to 
-tweak neuswc itself via config.mk before compiling hevel.
+tweak neuswc itself via config.mk before compiling mura.
 
-hevel-specific configuration is done at compile time via config.h.
+mura-specific configuration is done at compile time via config.h.
