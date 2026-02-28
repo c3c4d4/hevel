@@ -31,6 +31,7 @@ static const char *const term_flag = "-w";
 /* gui programs take over the geometry of the terminal, broken for xwayland */
 static const bool enable_terminal_spawning = true;
 
+/* define a list of terminals that you use */
 static const char *const terminal_app_ids[] = {
 	"havoc",
 	"st-wl",
@@ -50,9 +51,9 @@ static const float move_ease_factor = 0.30f;
  */
 static const bool scroll_drag_mode = true;
 
-/* whether or not to center the window
- * in drag mode it centers on both axis
- * otherwise on the vertical one
+/* whether or not to center the window.
+ * in drag mode, it centers on both axis
+ * otherwise on the vertical axis
  */
 static bool focus_center = true;
 
@@ -64,7 +65,7 @@ static bool focus_center = true;
 static const bool enable_zoom = true;
 
 /* customizable 2-1 chord
- * avaliable things:
+ * avaliable options:
  * - STICKY: make window not move when scroll
  * - FULLSCREEN: make a window take entire screen
  * - JUMP: switch focus to the closest window

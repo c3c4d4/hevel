@@ -11,7 +11,7 @@
 
 #ifdef __linux__
 #include <linux/input-event-codes.h>
-/* netbsd */
+/* define os-agnostic input codes for non-linux systems */
 #else
 #define BTN_LEFT    0x110
 #define BTN_RIGHT   0x111
@@ -163,7 +163,7 @@ focus_window(struct swc_window *swc, const char *reason)
 
 	swc_window_focus(swc);
 
-	/* zoom back to normalwhen focusing a window */
+	/* zoom to default size when focusing a window */
 	if (enable_zoom && swc && swc_get_zoom() != 1.0f) {
 		hevel.chord.zoom_target = 1.0f;
 		if (!hevel.chord.zoom_timer)
@@ -1437,6 +1437,8 @@ main(void)
 	
 	swc_add_binding(SWC_BINDING_KEY, SWC_MOD_LOGO | SWC_MOD_SHIFT,
 	                XKB_KEY_q, quit, NULL);
+	                
+	/* we can bind mouse buttons using SWC_MOD_ANY */
 	swc_add_binding(SWC_BINDING_BUTTON, SWC_MOD_ANY, BTN_LEFT, button, NULL);
 	swc_add_binding(SWC_BINDING_BUTTON, SWC_MOD_ANY, BTN_MIDDLE, button, NULL);
 	swc_add_binding(SWC_BINDING_BUTTON, SWC_MOD_ANY, BTN_RIGHT, button, NULL);
